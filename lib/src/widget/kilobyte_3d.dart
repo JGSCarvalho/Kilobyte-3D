@@ -19,7 +19,7 @@ class Kilobyte3D extends StatefulWidget {
   final int fps;
 
   /// The desired viewport size.
-  final Size size;
+  final Size? size;
 
   /// Creates a 3D viewport.
   ///
@@ -27,16 +27,16 @@ class Kilobyte3D extends StatefulWidget {
   ///
   /// ### Parameters:
   ///
-  /// - [scene]: The scene to render.
-  /// - [mode]: The rendering mode.
-  /// - [fps]: The target frame rate.
-  /// - [size]: The viewport size.
+  /// - [scene]: The scene graph to render.
+  /// - [mode]: The active rendering mode.
+  /// - [fps]: The target rendering frame rate.
+  /// - [size]: Optional fixed viewport dimensions.
   const Kilobyte3D({
     super.key,
     required this.scene,
     required this.mode,
     this.fps = 30,
-    this.size = Size.zero,
+    this.size,
   });
 
   @override
@@ -45,6 +45,7 @@ class Kilobyte3D extends StatefulWidget {
 
 class _Kilobyte3DState extends State<Kilobyte3D> {
   late final RenderClock _clock;
+  
   late CustomPaint _painter;
 
   @override
@@ -65,7 +66,6 @@ class _Kilobyte3DState extends State<Kilobyte3D> {
   Widget build(BuildContext context) {
     if (widget.mode == RenderMode.textured) {
       _painter = CustomPaint(
-        size: widget.size,
         painter: TexturedPainter(
           repaint: _clock,
           scene: widget.scene,
@@ -74,7 +74,6 @@ class _Kilobyte3DState extends State<Kilobyte3D> {
     }
     else {
       _painter = CustomPaint(
-        size: widget.size,
         painter: WireframePainter(
           repaint: _clock,
           scene: widget.scene,
@@ -85,8 +84,8 @@ class _Kilobyte3DState extends State<Kilobyte3D> {
     return Align(
       alignment: Alignment.center,
       child: SizedBox(
-        width: widget.size.width,
-        height: widget.size.height,
+        width: widget.size?.width,
+        height: widget.size?.height,
         child: ClipRect(
           child: _painter,
         ),

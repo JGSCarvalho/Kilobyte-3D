@@ -46,22 +46,26 @@ class _ExampleState extends State<Example> {
         scene.transform.setYaw(_yaw);
       },
       child: Kilobyte3D(
-        size: const Size(50, 50),
+        size: Size(
+          MediaQuery.sizeOf(context).width,
+          MediaQuery.sizeOf(context).height,
+        ),
         fps: 60,
         scene: scene,
-        mode: RenderMode.wireframe,
+        mode: RenderMode.textured,
       ),
     );
   }
 
   Future<void> addModel() async {
-    final content = await rootBundle.loadString('assets/suzanne.obj');
+    final content = await rootBundle.loadString('assets/a.obj');
 
     final figure = OBJ.parse(content);
+    figure.texture = await loadTexture('assets/a.bmp');
 
     figure.centerPivot();
     figure.transform.setTranslation(Vector3(0, 0, 0));
-    figure.transform.setScale(Vector3.all(0.33));
+    figure.transform.setScale(Vector3.all(0.75));
 
     scene.addChild(figure);
     scene.addChild(figure);

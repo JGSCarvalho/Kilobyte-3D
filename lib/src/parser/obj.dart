@@ -9,9 +9,6 @@ import '../scene/figure.dart';
 import '../transform/transform.dart';
 
 /// Wavefront OBJ parser.
-///
-/// Responsible for decoding OBJ geometry into engine-native structures.
-/// Supports vertices (v), normals (vn), texture coordinates (vt), and faces (f).
 abstract final class OBJ {
 
   /// Parses raw OBJ file content into a renderable [Figure].
@@ -52,15 +49,23 @@ abstract final class OBJ {
         uvs.add(_OBJ.uv(line));
       }
       else if (line.startsWith('f ')) {
-        faces.add(_OBJ.face(line));
+        faces.addAll(_OBJ.faces(line));
       }
     }
 
-    // Guarantee UV buffer consistency with vertex count.
     if (uvs.isEmpty) {
-      log('OBJ missing UVs, generating zeroed UV buffer...');
+      log('OBJ missing UVs, generating zeroed UV buffer and mapping faces...');
 
       uvs = List<Vector2>.generate(vertices.length, (_) => Vector2.zero());
+      
+      for (int i = 0; i < faces.length; i++) {
+        if (faces[i].uvIndices.isEmpty) {
+          faces[i] = Face(
+            vertexIndices: faces[i].vertexIndices,
+            uvIndices: List<int>.from(faces[i].vertexIndices), // Espelha os índices dos vértices
+          );
+        }
+      }
     }
 
     return Figure(
@@ -85,94 +90,204 @@ abstract final class _OBJ {
   /// Parses a vertex position line (`v`).
   ///
   /// ---
-  /// 
-  /// ### Format:
-  /// 
-  /// `v x y z`
+  ///
+  /// ### Format: `v x y z`
+  ///
+  /// ``` txt
+  ///       y
+  ///       ↑
+  ///       │
+  ///       │
+  ///       ●──────→ x
+  ///      /
+  ///     /
+  ///    z
+  /// ```
+  ///
+  /// Defines a geometric position in 3D space.
   static Vector3 vertex(String line) {
-    final p = line.split(_whitespace);
+    final parts = line.split(_whitespace);
 
-    return Vector3(
-      double.parse(p[1]),
-      double.parse(p[2]),
-      double.parse(p[3]),
-    );
+    return Vector3(double.parse(parts[1]), double.parse(parts[2]), double.parse(parts[3]));
   }
 
   /// Parses a vertex normal line (`vn`).
   ///
   /// ---
-  /// 
-  /// ### Format:
-  /// 
-  /// `vn x y z`
+  ///
+  /// ### Format: `vn x y z`
+  ///
+  /// ```txt
+  ///         surface
+  ///    ─────────────────
+  ///            ↑
+  ///            │ normal
+  ///            │
+  ///            ●
+  /// ```
+  ///
+  /// Defines a surface direction vector typically used for lighting calculations.
   static Vector3 normal(String line) {
-    final p = line.split(_whitespace);
+    final parts = line.split(_whitespace);
 
-    return Vector3(
-      double.parse(p[1]),
-      double.parse(p[2]),
-      double.parse(p[3]),
-    );
+    return Vector3(double.parse(parts[1]), double.parse(parts[2]), double.parse(parts[3]));
   }
 
   /// Parses a texture coordinate line (`vt`).
-  /// 
-  /// ---
-  /// 
-  /// ### Format:
-  /// 
-  /// `vt u v`
   ///
   /// ---
-  /// 
+  ///
+  /// ### Format: `vt u v`
+  ///
+  /// ``` txt
+  /// (0,0) ┌───────────→ U
+  ///       │
+  ///       │
+  ///       │
+  ///       ↓
+  ///       V
+  /// ```
+  ///
+  /// ---
+  ///
   /// ### Notes:
-  /// 
-  /// - The V coordinate is inverted to match Flutter's coordinate system.
+  ///
+  /// - The V coordinate is inverted to match Flutter's top-left coordinate system.
   static Vector2 uv(String line) {
-    final p = line.split(_whitespace);
+    final parts = line.split(_whitespace);
 
-    final u = double.parse(p[1]);
-    final v = 1.0 - double.parse(p[2]);
+    final u = double.parse(parts[1]);
+    final v = 1.0 - double.parse(parts[2]);
 
     return Vector2(u, v);
   }
 
-  /// Parses a face definition line (`f`).
+  /// Parses a polygon face definition line (`f`).
   ///
   /// ---
   ///
-  /// ### Format:
+  /// ### Formats:
   ///
-  /// `f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3`
+  /// Triangle: `f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3`
+  /// 
+  /// ``` txt
+  ///         v1
+  ///        /  \
+  ///       /    \
+  ///     v2------v3
+  /// ```
   ///
+  /// Quadrilateral: `f v1 v2 v3 v4`
+  /// 
+  /// ``` txt
+  ///    v1--------v2
+  ///    |          |
+  ///    |          |
+  ///    v4--------v3
+  /// ```
+  ///
+  /// N-gon: `f v1 v2 v3 v4 v5 ...`
+  /// 
+  /// ``` txt
+  ///         v1
+  ///      .-''''-.
+  ///    v6        v2
+  ///    |          |
+  ///    v5        v3
+  ///      '-.__.-'
+  ///         v4
+  /// ```
+  /// 
   /// ---
   ///
   /// ### Notes:
   ///
-  /// - Indices are converted from 1-based OBJ indexing to 0-based runtime indexing.
-  /// - UV indices are preserved independently from vertex indices, matching the OBJ specification.
-  static Face face(String line) {
-    final p = line.split(_whitespace).sublist(1);
+  /// - Vertex indices are converted from OBJ 1-based indexing to 0-based runtime indexing.
+  /// - UV indices are preserved independently from vertex indices.
+  /// - Faces containing more than 3 vertices are automatically triangulated using a triangle-fan algorithm.
+  /// - Invalid faces containing fewer than 3 vertices are ignored.
+  static List<Face> faces(String line) {
+    final parts = line.split(_whitespace).sublist(1);
 
-    final vertexIndices = <int>[];
-    final uvIndices = <int>[];
+    final vtIndices = <int> [];
+    final uvIndices = <int> [];
 
-    for (final part in p) {
+    for (final part in parts) {
       if (part.isEmpty) continue;
 
       final tokens = part.split('/');
 
-      vertexIndices.add(int.parse(tokens[0]) - 1);
+      vtIndices.add(int.parse(tokens[0]) - 1);
 
       if (tokens.length > 1 && tokens[1].isNotEmpty) {
         uvIndices.add(int.parse(tokens[1]) - 1);
       }
     }
 
-    return Face(
-      vertexIndices: vertexIndices,
-      uvIndices: uvIndices,
-    );
+    // Skip invalid faces.
+    if (vtIndices.length < 3) return const [];
+
+    // Perfect triangle, this skips the triangle-fan algorithm.
+    if (vtIndices.length == 3) {
+      final triangle = Face(
+        vertexIndices: vtIndices,
+        uvIndices: uvIndices,
+      );
+
+      return [triangle];
+    }
+
+    return _triangulate(vtIndices, uvIndices);
+  }
+
+  /// Triangulates polygon geometry using the triangle-fan algorithm.
+  ///
+  /// The algorithm converts an arbitrary N-gon into `(N - 2)` triangles by reusing the first polygon vertex as a
+  /// shared pivot.
+  ///
+  /// ---
+  ///
+  /// ### Example:
+  ///
+  /// ```txt
+  ///         v0
+  ///      .-''''-.
+  ///    v5        v1
+  ///    |          |
+  ///    v4        v2
+  ///      '-.__.-'
+  ///         v3
+  /// ```
+  ///
+  /// The N-gon above (`f v0 v1 v2 v3 v4 v5`) is decomposed into 4 triangles:
+  ///
+  /// ```txt
+  ///        v0                  v0                  v0                  v0
+  ///       /  \                /  \                /  \                /  \
+  ///      /    \              /    \              /    \              /    \
+  ///    v1------v2          v2------v3          v3------v4          v4------v5
+  /// ```
+  ///
+  /// UV indices follow the exact same triangulation topology as the generated vertex triangles.
+  static List<Face> _triangulate(List<int> vtIndices, List<int> uvIndices) {
+    final hasUVs = uvIndices.length == vtIndices.length;
+    final faces = <Face> [];
+
+    for (int i = 1; i < vtIndices.length - 1; i++) {
+      final triVertices = [vtIndices[0], vtIndices[i], vtIndices[i + 1]];
+
+      List<int> triUvs = [];
+
+      if (hasUVs) {
+        triUvs = [uvIndices[0], uvIndices[i], uvIndices[i + 1]];
+      }
+
+      faces.add(Face(
+        vertexIndices: triVertices,
+        uvIndices: triUvs,
+      ));
+    }
+
+    return faces;
   }
 }

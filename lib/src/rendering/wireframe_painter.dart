@@ -42,7 +42,8 @@ class WireframePainter extends CustomPainter {
       ..color = const Color(0xFF607D8B)
       ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
 
     _render(
       node: scene,
@@ -69,14 +70,14 @@ class WireframePainter extends CustomPainter {
           camera: camera,
           figure: node,
           size: size,
-        ).cullBackfaces().cullOffscreen(size);
+        ).cullOffscreen(size);
       }
       else {
         geometry = PerspectiveProjector.project(
           camera: camera,
           figure: node,
           size: size,
-        ).cullBackfaces().cullOffscreen(size);
+        ).cullOffscreen(size);
       }
 
       WireframeRenderer.draw(
