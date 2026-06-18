@@ -1,0 +1,16 @@
+# Android:
+
+/.gradle
+/captures/
+/gradlew
+/gradlew.bat
+/local.properties
+.cxx/
+gradle-wrapper.jar
+GeneratedPluginRegistrant.java
+
+# Keystore:
+
+key.properties
+**/*.keystore
+**/*.jks
