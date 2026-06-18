@@ -29,7 +29,6 @@ class Kilobyte3D extends StatefulWidget {
   ///
   /// - [scene]: The scene to render.
   /// - [mode]: The rendering mode.
-  /// - [texture]: The texture used by textured rendering.
   /// - [fps]: The target frame rate.
   /// - [size]: The viewport size.
   const Kilobyte3D({
@@ -46,6 +45,7 @@ class Kilobyte3D extends StatefulWidget {
 
 class _Kilobyte3DState extends State<Kilobyte3D> {
   late final RenderClock _clock;
+  late CustomPaint _painter;
 
   @override
   void initState() {
@@ -64,7 +64,7 @@ class _Kilobyte3DState extends State<Kilobyte3D> {
   @override
   Widget build(BuildContext context) {
     if (widget.mode == RenderMode.textured) {
-      return CustomPaint(
+      _painter = CustomPaint(
         size: widget.size,
         painter: TexturedPainter(
           repaint: _clock,
@@ -73,7 +73,7 @@ class _Kilobyte3DState extends State<Kilobyte3D> {
       );
     }
     else {
-      return CustomPaint(
+      _painter = CustomPaint(
         size: widget.size,
         painter: WireframePainter(
           repaint: _clock,
@@ -81,5 +81,16 @@ class _Kilobyte3DState extends State<Kilobyte3D> {
         ),
       );
     }
+
+    return Align(
+      alignment: Alignment.center,
+      child: SizedBox(
+        width: widget.size.width,
+        height: widget.size.height,
+        child: ClipRect(
+          child: _painter,
+        ),
+      ),
+    );
   }
 }

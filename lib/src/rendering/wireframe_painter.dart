@@ -13,6 +13,7 @@ import '../scene/node.dart';
 import '../scene/scene.dart';
 
 import '../rendering/wireframe_renderer.dart';
+import '../rendering/geometry_culling.dart';
 
 /// Renders a scene using wireframe geometry.
 ///
@@ -68,14 +69,14 @@ class WireframePainter extends CustomPainter {
           camera: camera,
           figure: node,
           size: size,
-        ).cullBackfaces();
+        ).cullBackfaces().cullOffscreen(size);
       }
       else {
         geometry = PerspectiveProjector.project(
           camera: camera,
           figure: node,
           size: size,
-        ).cullBackfaces();
+        ).cullBackfaces().cullOffscreen(size);
       }
 
       WireframeRenderer.draw(

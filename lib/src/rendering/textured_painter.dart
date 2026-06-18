@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../geometry/render_geometry.dart';
 
 import '../rendering/backface_culling.dart';
+import '../rendering/geometry_culling.dart';
 import '../rendering/orthographic_projector.dart';
 import '../rendering/perspective_projector.dart';
 import '../rendering/projection_mode.dart';
@@ -60,17 +61,19 @@ class TexturedPainter extends CustomPainter {
           camera: camera,
           figure: node,
           size: size,
-        ).cullBackfaces();
+        ).cullBackfaces().cullOffscreen(size);
       }
       else {
         geometry = PerspectiveProjector.project(
           camera: camera,
           figure: node,
           size: size,
-        ).cullBackfaces();
+        ).cullBackfaces().cullOffscreen(size);
       }
 
-      if (node.texture == null) throw Exception('Texture is null!');
+      assert(node.texture != null, 'Figures must have a texture, provide a texture or change to wireframe mode!');
+      
+      if (node.texture == null) return;
       
       final paint = Paint()
         ..shader = ui.ImageShader(

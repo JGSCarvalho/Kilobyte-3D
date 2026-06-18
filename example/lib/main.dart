@@ -46,6 +46,7 @@ class _ExampleState extends State<Example> {
         scene.transform.setYaw(_yaw);
       },
       child: Kilobyte3D(
+        size: const Size(50, 50),
         fps: 60,
         scene: scene,
         mode: RenderMode.wireframe,

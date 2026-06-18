@@ -35,8 +35,15 @@ abstract final class PerspectiveProjector {
       final world = worldMatrix.transform3(local.clone());
       final view = camera.toViewSpace(world);
 
-      // Discard vertices located behind the camera or too close to the projection plane.
-      if (view.z <= 0.1) continue;
+      // If the vertex is behind the camera, or too close to the camera, discard it.
+      if (view.z <= 0.1) {
+        vertices[i] = const RenderVertex(
+          position: Offset.zero,
+          depth: -1.0,
+        );
+        
+        continue;
+      }
 
       // Perspective division.
       // As depth increases, the scale factor decreases, causing distant objects to appear smaller on screen.

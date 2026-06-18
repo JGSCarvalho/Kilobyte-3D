@@ -8,8 +8,7 @@ import '../scene/figure.dart';
 
 /// Projects geometry using an orthographic projection model.
 ///
-/// In orthographic projection, depth (Z) has no influence on scale.
-/// Parallel lines remain parallel in screen-space.
+/// In orthographic projection, depth (Z) has no influence on scale: parallel lines remain parallel in screen-space.
 abstract final class OrthographicProjector {
 
   /// Projects a figure into 2D screen-space using orthographic projection.
@@ -33,6 +32,16 @@ abstract final class OrthographicProjector {
       final local = figure.vertices[i];
       final world = worldMatrix.transform3(local.clone());
       final view = camera.toViewSpace(world);
+
+      // If the vertex is behind the camera, or too close to the camera, discard it.
+      if (view.z <= 0.1) {
+        vertices[i] = const RenderVertex(
+          position: Offset.zero,
+          depth: -1.0,
+        );
+        
+        continue;
+      }
 
       // Orthographic projection ignores depth, preserving the apparent size of objects regardless of their distance
       // from the camera.
