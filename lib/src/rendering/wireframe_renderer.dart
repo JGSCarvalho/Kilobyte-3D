@@ -1,6 +1,6 @@
 import 'dart:ui';
 
-import '../geometry/render_geometry.dart';
+import '../geometry/projected_geometry.dart';
 
 /// Rasterizes geometry as wireframe lines.
 ///
@@ -21,22 +21,23 @@ abstract final class WireframeRenderer {
   /// - [paint]: Stroke configuration used for line rendering.
   static void draw({
     required Canvas canvas,
-    required RenderGeometry geometry,
+    required ProjectedGeometry geometry,
     required Paint paint,
   }) {
-    final points = geometry.vertices;
-    final faces = geometry.faces;
+    final vpVertices = geometry.vertices;
+    final vpFaces = geometry.faces;
 
-    for (final face in faces) {
-      final count = face.vertexIndices.length;
+    for (final vpFace in vpFaces) {
+      final face = vpFace.face;
+      final count = face.vIndices.length;
 
       if (count < 2) continue;
 
       for (int i = 0; i < count; i++) {
-        final p1 = points[face.vertexIndices[i]];
-        final p2 = points[face.vertexIndices[(i + 1) % count]];
+        final vt1 = vpVertices[face.vIndices[i]];
+        final vt2 = vpVertices[face.vIndices[(i + 1) % count]];
 
-        canvas.drawLine(p1.position, p2.position, paint);
+        canvas.drawLine(vt1.position, vt2.position, paint);
       }
     }
   }

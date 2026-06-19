@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -41,7 +42,7 @@ class _ExampleState extends State<Example> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onPanUpdate: (details) {
-        _yaw += details.delta.dx * 0.01;
+        _yaw += details.delta.dx * -0.01;
     
         scene.transform.setYaw(_yaw);
       },
@@ -50,7 +51,7 @@ class _ExampleState extends State<Example> {
           MediaQuery.sizeOf(context).width,
           MediaQuery.sizeOf(context).height,
         ),
-        fps: 60,
+        fps: 30,
         scene: scene,
         mode: RenderMode.textured,
       ),
@@ -65,6 +66,7 @@ class _ExampleState extends State<Example> {
 
     figure.centerPivot();
     figure.transform.setTranslation(Vector3(0, 0, 0));
+    figure.transform.setYaw(pi);
     figure.transform.setScale(Vector3.all(0.75));
 
     scene.addChild(figure);

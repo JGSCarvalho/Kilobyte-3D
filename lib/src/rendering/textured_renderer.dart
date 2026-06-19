@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:vector_math/vector_math_64.dart';
 
-import '../geometry/render_geometry.dart';
+import '../geometry/projected_geometry.dart';
 
 /// Rasterizes geometry using textured triangle rendering.
 ///
@@ -18,15 +18,15 @@ abstract final class TexturedRenderer {
   /// fan triangulation. Safely handles missing or out-of-bounds UV/vertex indices.
   static void draw({
     required Canvas canvas,
-    required RenderGeometry geometry,
+    required ProjectedGeometry geometry,
     required List<Vector2> uvs,
     required ui.Image texture,
     required Paint paint,
   }) {
-    final points = geometry.vertices;
-    final faces = geometry.faces;
+    final vpVertices = geometry.vertices;
+    final vpFaces = geometry.faces;
 
-    if (points.isEmpty || faces.isEmpty || uvs.isEmpty) {
+    if (vpVertices.isEmpty || vpFaces.isEmpty || uvs.isEmpty) {
       return;
     }
 
@@ -40,32 +40,33 @@ abstract final class TexturedRenderer {
     final texWidth = texture.width.toDouble();
     final texHeight = texture.height.toDouble();
 
-    for (final face in faces) {
-      final numVertices = face.vertexIndices.length;
+    for (final vpFace in vpFaces) {
+      final face = vpFace.face;
+      final nVertices = face.vIndices.length;
       
       // A valid polygon face needs at least 3 vertices
-      if (numVertices < 3) continue;
+      if (nVertices < 3) continue;
 
       // Helper function to process and push a vertex safely into the Flutter buffers
       void processVertex(int localIndex) {
-        if (localIndex >= face.vertexIndices.length) return;
+        if (localIndex >= face.vIndices.length) return;
 
-        final vertexIndex = face.vertexIndices[localIndex];
+        final vertexIndex = face.vIndices[localIndex];
         
         // Defend against incomplete UV streams within the face definition
-        final uvIndex = (localIndex < face.uvIndices.length) 
-            ? face.uvIndices[localIndex] 
+        final uvIndex = (localIndex < face.vtIndices.length) 
+            ? face.vtIndices[localIndex] 
             : 0;
 
         // CRITICAL PROTECTION 1: Prevent RangeError on global vertices buffer
-        if (vertexIndex < 0 || vertexIndex >= points.length) return;
+        if (vertexIndex < 0 || vertexIndex >= vpVertices.length) return;
 
         final key = '$vertexIndex:$uvIndex';
 
         if (!indexMap.containsKey(key)) {
           indexMap[key] = positions.length;
 
-          positions.add(points[vertexIndex].position);
+          positions.add(vpVertices[vertexIndex].position);
 
           // CRITICAL PROTECTION 2: Prevent RangeError on global UV buffer
           final uv = (uvIndex >= 0 && uvIndex < uvs.length)
@@ -87,7 +88,7 @@ abstract final class TexturedRenderer {
 
       // Fan Triangulation: Decomposes any n-gon (Triangles = 1 iteration, Quads = 2 iterations)
       // into a series of independent triangles perfectly aligned for the GPU buffer.
-      for (int i = 1; i < numVertices - 1; i++) {
+      for (int i = 1; i < nVertices - 1; i++) {
         processVertex(0);
         processVertex(i);
         processVertex(i + 1);

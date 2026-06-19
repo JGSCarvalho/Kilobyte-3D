@@ -2,10 +2,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import '../geometry/render_geometry.dart';
+import '../geometry/projected_geometry.dart';
 
-import '../rendering/backface_culling.dart';
-import '../rendering/geometry_culling.dart';
 import '../rendering/orthographic_projector.dart';
 import '../rendering/perspective_projector.dart';
 import '../rendering/projection_mode.dart';
@@ -53,8 +51,8 @@ class TexturedPainter extends CustomPainter {
     required Size size,
     required Camera camera,
   }) {
-    if (node is Figure && node.uvs != null) {
-      late final RenderGeometry geometry;
+    if (node is Figure) {
+      late final ProjectedGeometry geometry;
 
       if (camera.projectionMode == ProjectionMode.orthographic) {
         geometry = OrthographicProjector.project(
@@ -87,7 +85,7 @@ class TexturedPainter extends CustomPainter {
       TexturedRenderer.draw(
         canvas: canvas,
         geometry: geometry,
-        uvs: node.uvs!,
+        uvs: node.uvs,
         texture: node.texture!,
         paint: paint,
       );

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../geometry/render_geometry.dart';
+import '../geometry/projected_geometry.dart';
 
-import '../rendering/backface_culling.dart';
 import '../rendering/orthographic_projector.dart';
 import '../rendering/perspective_projector.dart';
 import '../rendering/projection_mode.dart';
@@ -13,7 +12,6 @@ import '../scene/node.dart';
 import '../scene/scene.dart';
 
 import '../rendering/wireframe_renderer.dart';
-import '../rendering/geometry_culling.dart';
 
 /// Renders a scene using wireframe geometry.
 ///
@@ -63,7 +61,7 @@ class WireframePainter extends CustomPainter {
     required Paint paint,
   }) {
     if (node is Figure) {
-      late final RenderGeometry geometry;
+      late final ProjectedGeometry geometry;
 
       if (camera.projectionMode == ProjectionMode.orthographic) {
         geometry = OrthographicProjector.project(

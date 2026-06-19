@@ -1,6 +1,6 @@
 library;
 
-export 'package:kilobyte_3d/src/parser/obj.dart';
+export 'package:kilobyte_3d/src/formats/obj.dart';
 
 export 'package:kilobyte_3d/src/scene/camera.dart';
 export 'package:kilobyte_3d/src/scene/node.dart';

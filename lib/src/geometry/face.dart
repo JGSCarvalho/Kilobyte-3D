@@ -9,18 +9,15 @@ class Face {
   /// The vertex indices that define this face.
   ///
   /// Each index references a vertex in the parent geometry.
-  final List<int> vertexIndices;
+  final List<int> vIndices;
 
   /// The UV indices associated with the face vertices.
   ///
   /// Each index references a UV coordinate in the parent geometry UV buffer.
-  ///
-  /// Wavefront OBJ files maintain independent index streams for vertices and UVs, therefore these values are not
-  /// guaranteed to match [vertexIndices].
-  final List<int> uvIndices;
+  final List<int> vtIndices;
 
   const Face({
-    required this.vertexIndices,
-    required this.uvIndices,
+    required this.vIndices,
+    required this.vtIndices,
   });
 }

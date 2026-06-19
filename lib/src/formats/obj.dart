@@ -59,10 +59,10 @@ abstract final class OBJ {
       uvs = List<Vector2>.generate(vertices.length, (_) => Vector2.zero());
       
       for (int i = 0; i < faces.length; i++) {
-        if (faces[i].uvIndices.isEmpty) {
+        if (faces[i].vtIndices.isEmpty) {
           faces[i] = Face(
-            vertexIndices: faces[i].vertexIndices,
-            uvIndices: List<int>.from(faces[i].vertexIndices), // Espelha os índices dos vértices
+            vIndices: faces[i].vIndices,
+            vtIndices: List<int>.from(faces[i].vIndices), // Reuse vertex indices as UV indices.
           );
         }
       }
@@ -209,35 +209,35 @@ abstract final class _OBJ {
   static List<Face> faces(String line) {
     final parts = line.split(_whitespace).sublist(1);
 
+    final vIndices = <int> [];
     final vtIndices = <int> [];
-    final uvIndices = <int> [];
 
     for (final part in parts) {
       if (part.isEmpty) continue;
 
       final tokens = part.split('/');
 
-      vtIndices.add(int.parse(tokens[0]) - 1);
+      vIndices.add(int.parse(tokens[0]) - 1);
 
       if (tokens.length > 1 && tokens[1].isNotEmpty) {
-        uvIndices.add(int.parse(tokens[1]) - 1);
+        vtIndices.add(int.parse(tokens[1]) - 1);
       }
     }
 
     // Skip invalid faces.
-    if (vtIndices.length < 3) return const [];
+    if (vIndices.length < 3) return const [];
 
     // Perfect triangle, this skips the triangle-fan algorithm.
-    if (vtIndices.length == 3) {
+    if (vIndices.length == 3) {
       final triangle = Face(
-        vertexIndices: vtIndices,
-        uvIndices: uvIndices,
+        vIndices: vIndices,
+        vtIndices: vtIndices,
       );
 
       return [triangle];
     }
 
-    return _triangulate(vtIndices, uvIndices);
+    return _triangulate(vIndices, vtIndices);
   }
 
   /// Triangulates polygon geometry using the triangle-fan algorithm.
@@ -283,8 +283,8 @@ abstract final class _OBJ {
       }
 
       faces.add(Face(
-        vertexIndices: triVertices,
-        uvIndices: triUvs,
+        vIndices: triVertices,
+        vtIndices: triUvs,
       ));
     }
 
