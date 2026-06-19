@@ -22,9 +22,14 @@ class Figure extends Node {
   /// The diffuse texture applied to the surface of the figure.
   ui.Image? texture;
 
-  /// Optional texture coordinates associated with the geometry.
+  /// The texture coordinate buffer (UV map) for the geometry.
   ///
-  /// Each [Vector2] represents a UV coordinate in texture space.
+  /// Each [Vector2] represents a normalized position in texture space (typically ranging from `0.0` to `1.0`) where:
+  ///
+  /// - `x` corresponds to the horizontal texture axis (U);
+  /// - `y` corresponds to the vertical texture axis (V), pre-inverted to align with Flutter's top-left canvas origin.
+  ///
+  /// Projected faces reference indices within this list to correctly map image textures onto 2D screen fragments.
   List<Vector2> uvs;
 
   /// The vertices that define the geometry of the figure.

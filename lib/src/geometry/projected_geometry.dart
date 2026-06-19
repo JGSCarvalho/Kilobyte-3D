@@ -24,8 +24,7 @@ class ProjectedGeometry {
 
   /// The texture coordinate buffer (UV map) for the geometry.
   ///
-  /// Each [Vector2] represents a normalized position in texture space (typically ranging from `0.0` to `1.0`)
-  /// where:
+  /// Each [Vector2] represents a normalized position in texture space (typically ranging from `0.0` to `1.0`) where:
   ///
   /// - `x` corresponds to the horizontal texture axis (U);
   /// - `y` corresponds to the vertical texture axis (V), pre-inverted to align with Flutter's top-left canvas origin.
