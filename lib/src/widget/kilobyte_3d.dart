@@ -21,6 +21,8 @@ class Kilobyte3D extends StatefulWidget {
   /// The desired viewport size.
   final Size? size;
 
+  final bool backfaceCulling;
+
   /// Creates a 3D viewport.
   ///
   /// ---
@@ -35,6 +37,7 @@ class Kilobyte3D extends StatefulWidget {
     super.key,
     required this.scene,
     required this.mode,
+    this.backfaceCulling = true,
     this.fps = 30,
     this.size,
   });

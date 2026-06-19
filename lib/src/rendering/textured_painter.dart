@@ -25,9 +25,12 @@ class TexturedPainter extends CustomPainter {
   /// The scene to be rendered.
   final Scene scene;
 
+  final bool backfaceCulling;
+
   TexturedPainter({
     required super.repaint,
     required this.scene,
+    this.backfaceCulling = true,
   });
 
   @override
@@ -51,27 +54,31 @@ class TexturedPainter extends CustomPainter {
     required Size size,
     required Camera camera,
   }) {
-    if (node is Figure) {
-      late final ProjectedGeometry geometry;
+    if (node is Figure) {      
+      if (node.texture == null) {
+        assert(node.texture != null, 'Figures must have a texture, provide a texture or change to wireframe mode!');
+
+        return;
+      }
+
+      ProjectedGeometry geometry;
 
       if (camera.projectionMode == ProjectionMode.orthographic) {
         geometry = OrthographicProjector.project(
           camera: camera,
           figure: node,
           size: size,
-        ).cullBackfaces().cullOffscreen(size);
+        ).cullOffscreen(size);
       }
       else {
         geometry = PerspectiveProjector.project(
           camera: camera,
           figure: node,
           size: size,
-        ).cullBackfaces().cullOffscreen(size);
+        ).cullOffscreen(size);
       }
 
-      assert(node.texture != null, 'Figures must have a texture, provide a texture or change to wireframe mode!');
-      
-      if (node.texture == null) return;
+      if (backfaceCulling) geometry = geometry.cullBackfaces();
       
       final paint = Paint()
         ..shader = ui.ImageShader(
