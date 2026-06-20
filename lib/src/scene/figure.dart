@@ -45,12 +45,18 @@ class Figure extends Node {
     this.texture,
   });
 
-  /// Re-centers the figure's pivot using the center of its Axis-Aligned Bounding Box (AABB).
-  ///
-  /// All vertices are translated so that the AABB center becomes the local origin (0, 0, 0).
-  ///
-  /// To preserve the figure's visual position in world space, the same offset is applied to the node's local position.
-  void centerPivot() {
+  /// Re-centers the figure's local pivot using the center of its Axis-Aligned Bounding Box (AABB). All vertices are
+  /// translated so that the AABB center becomes the local origin `(0, 0, 0)`.
+  /// 
+  /// Optionally, the figure's local translation can be compensated to preserve its visual position in world space.
+  /// 
+  /// ---
+  /// 
+  /// ### Parameters:
+  /// 
+  /// - [keepWorldPosition]: When enabled, the figure's local translation is adjusted by the same pivot offset so the
+  /// figure remains visually stationary in world space.
+  void centerPivot([bool keepWorldPosition = false]) {
     if (vertices.isEmpty) return;
 
     double minX =   double.infinity; double minY =   double.infinity; double minZ =   double.infinity;
@@ -74,10 +80,11 @@ class Figure extends Node {
       vertex.sub(center);
     }
 
-    // Preserve the figure's world-space position.
-    final translation = transform.translation..add(center);
+    if (keepWorldPosition) {
+      final translation = transform.translation..add(center);
 
-    transform.setTranslation(translation);
+      transform.setTranslation(translation);
+    }
   }
 
   /// Subdivides triangle geometry to increase mesh density and reduce rendering artifacts.

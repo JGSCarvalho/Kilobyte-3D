@@ -2,14 +2,18 @@ import 'package:vector_math/vector_math_64.dart';
 
 /// Encapsulates the affine transformation properties of an entity in 3D space.
 ///
-/// A [Transform] stores the local position, rotation, and scale of an entity relative to its parent coordinate system.
+/// A [Transform] stores the local translation, orientation, and scale of an entity relative to its parent coordinate
+/// system.
 ///
-/// These properties are combined into a model matrix used throughout the rendering pipeline to transform vertices from
-/// local space into world space.
+/// The engine uses a right-handed coordinate system:
+///
+/// - `+X`: Right;
+/// - `+Y`: Up;
+/// - `-Z`: Forward.
 class Transform {
 
-  /// Local orientation expressed as Euler angles (pitch, yaw, roll) in radians.
-  Vector3 _rotation;
+  /// Local orientation represented as a quaternion.
+  Quaternion _rotation;
 
   /// Local scaling factors applied along each axis.
   Vector3 _scale;
@@ -30,24 +34,24 @@ class Transform {
   /// ### Parameters:
   ///
   /// - [position]: Initial local position relative to the parent.
-  /// - [rotation]: Initial local rotation expressed in radians.
+  /// - [rotation]: Initial local orientation represented as a quaternion.
   /// - [scale]: Initial local scale factors.
   ///
   /// Any omitted parameter falls back to its identity value.
   factory Transform({
     Vector3? position,
-    Vector3? rotation,
+    Quaternion? rotation,
     Vector3? scale,
   }) {
     return Transform._(
       position ?? Vector3.zero(),
-      rotation ?? Vector3.zero(),
+      rotation ?? Quaternion.identity(),
       scale ?? Vector3.all(1),
     );
   }
 
-  /// Returns a copy of the current local rotation in radians.
-  Vector3 get rotation => Vector3.copy(_rotation);
+  /// Returns a copy of the current local orientation.
+  Quaternion get rotation => _rotation.clone();
 
   /// Returns a copy of the current local scale.
   Vector3 get scale => Vector3.copy(_scale);
@@ -55,78 +59,145 @@ class Transform {
   /// Returns a copy of the current local translation.
   Vector3 get translation => Vector3.copy(_translation);
 
+  /// Returns the local forward direction.
+  Vector3 get forward {
+    return _rotation.rotated(Vector3(0, 0, -1)).normalized();
+  }
+
+  /// Returns the local right direction.
+  Vector3 get right {
+    return _rotation.rotated(Vector3(1, 0, 0)).normalized();
+  }
+
+  /// Returns the local up direction.
+  Vector3 get up {
+    return _rotation.rotated(Vector3(0, 1, 0)).normalized();
+  }
+
   /// Replaces the current local translation.
-  /// 
+  ///
   /// ---
   ///
   /// ### Parameters:
   ///
   /// - [translation]: The local translation of the entity relative to its parent coordinate system.
-  void setTranslation(Vector3 translation) => _translation = translation;
+  void setTranslation(Vector3 translation) {
+    _translation = translation;
+  }
 
-  /// Replaces the current local rotation.
-  /// 
+  /// Replaces the current local orientation.
+  ///
   /// ---
   ///
   /// ### Parameters:
   ///
-  /// - [rotation]: The local rotation expressed as Euler angles (pitch, yaw, roll) in radians.
-  void setRotation(Vector3 rotation) => _rotation = rotation;
+  /// - [rotation]: The local orientation represented as a quaternion.
+  void setRotation(Quaternion rotation) {
+    _rotation = rotation.normalized();
+  }
 
-  /// Sets the local pitch rotation around the X axis.
-  /// 
+  /// Replaces the current local orientation using Euler angles in radians.
+  ///
   /// ---
   ///
   /// ### Parameters:
   ///
-  /// - [pitch]: The rotation angle around the local X axis in radians.
-  void setPitch(double pitch) => _rotation.x = pitch;
+  /// - [euler]: Rotation expressed as pitch, yaw, and roll in radians.
+  void setEulerRotation(Vector3 euler) {
+    final qx = Quaternion.axisAngle(Vector3(1, 0, 0), euler.x);
+    final qy = Quaternion.axisAngle(Vector3(0, 1, 0), euler.y);
+    final qz = Quaternion.axisAngle(Vector3(0, 0, 1), euler.z);
 
-  /// Sets the local yaw rotation around the Y axis.
-  /// 
+    _rotation = (qy * qx * qz).normalized();
+  }
+
+  /// Rotates the transform around the local X axis.
+  ///
   /// ---
   ///
   /// ### Parameters:
   ///
-  /// - [yaw]: The rotation angle around the local Y axis in radians.
-  void setYaw(double yaw) => _rotation.y = yaw;
+  /// - [radians]: Rotation angle in radians.
+  void rotateX(double radians) {
+    final delta = Quaternion.axisAngle(Vector3(1, 0, 0), radians);
 
-  /// Sets the local roll rotation around the Z axis.
-  /// 
+    _rotation = (_rotation * delta).normalized();
+  }
+
+  /// Rotates the transform around the local Y axis.
+  ///
   /// ---
   ///
   /// ### Parameters:
   ///
-  /// - [roll]: The rotation angle around the local Z axis in radians.
-  void setRoll(double roll) => _rotation.z = roll;
+  /// - [radians]: Rotation angle in radians.
+  void rotateY(double radians) {
+    final delta = Quaternion.axisAngle(Vector3(0, 1, 0), radians);
+
+    _rotation = (_rotation * delta).normalized();
+  }
+
+  /// Rotates the transform around the local Z axis.
+  ///
+  /// ---
+  ///
+  /// ### Parameters:
+  ///
+  /// - [radians]: Rotation angle in radians.
+  void rotateZ(double radians) {
+    final delta = Quaternion.axisAngle(Vector3(0, 0, 1), radians);
+
+    _rotation = (_rotation * delta).normalized();
+  }
+
+  /// Reorients the transform so that its forward direction points toward the specified target position.
+  ///
+  /// ---
+  ///
+  /// ### Parameters:
+  ///
+  /// - [target]: The target position expressed in world space.
+  /// - [worldUp]: The global up direction used to construct the orientation.
+  void lookAt(
+    Vector3 target,
+    {
+      Vector3? worldUp,
+    }
+  ) {
+    final upAxis = worldUp ?? Vector3(0, 1, 0);
+    
+    final forward = (target - _translation).normalized();
+    final right = forward.cross(upAxis).normalized();
+    final up = right.cross(forward).normalized();
+
+    final rotationMatrix = Matrix3.columns(right, up, - forward);
+
+    _rotation = Quaternion.fromRotation(rotationMatrix);
+  }
 
   /// Replaces the current local scale.
-  /// 
+  ///
   /// ---
   ///
   /// ### Parameters:
   ///
   /// - [scale]: The local scale factors applied along each axis.
-  void setScale(Vector3 scale) => _scale = scale;
+  void setScale(Vector3 scale) {
+    _scale = scale;
+  }
 
-  /// Builds the local model matrix from position, rotation, and scale.
+  /// Builds the local model matrix from translation, rotation, and scale.
   ///
   /// The resulting matrix follows:
   ///
-  ///   T * Rx * Ry * Rz * S
+  ///   T * R * S
   ///
-  /// This preserves local scaling and rotation before positioning the entity in world space.
+  /// This preserves local scaling and orientation before positioning the entity in world space.
   Matrix4 get matrix {
-    final matrix = Matrix4.identity();
-
-    matrix.translateByVector3(_translation);
-
-    matrix.rotateX(_rotation.x);
-    matrix.rotateY(_rotation.y);
-    matrix.rotateZ(_rotation.z);
-
-    matrix.scaleByVector3(_scale);
-
-    return matrix;
+    return Matrix4.compose(
+      _translation,
+      _rotation,
+      _scale,
+    );
   }
 }

@@ -7,6 +7,13 @@ import '../rendering/wireframe_painter.dart';
 
 import '../scene/scene.dart';
 
+/// A 3D viewport widget.
+/// 
+/// The engine uses a right-handed coordinate system:
+/// 
+/// +X = right
+/// +Y = up
+/// -Z = forward
 class Kilobyte3D extends StatefulWidget {
 
   /// The scene to be rendered.
@@ -19,7 +26,7 @@ class Kilobyte3D extends StatefulWidget {
   final int fps;
 
   /// The desired viewport size.
-  final Size? size;
+  final Size size;
 
   final bool backfaceCulling;
 
@@ -37,9 +44,9 @@ class Kilobyte3D extends StatefulWidget {
     super.key,
     required this.scene,
     required this.mode,
+    required this.size,
     this.backfaceCulling = true,
     this.fps = 30,
-    this.size,
   });
 
   @override
@@ -88,8 +95,8 @@ class _Kilobyte3DState extends State<Kilobyte3D> {
     return Align(
       alignment: Alignment.center,
       child: SizedBox(
-        width: widget.size?.width,
-        height: widget.size?.height,
+        width: widget.size.width,
+        height: widget.size.height,
         child: ClipRect(
           child: _painter,
         ),
