@@ -72,6 +72,7 @@ class _Kilobyte3DState extends State<Kilobyte3D> {
         painter: TexturedPainter(
           repaint: _clock,
           scene: widget.scene,
+          backfaceCulling: widget.backfaceCulling,
         ),
       );
     }
