@@ -35,7 +35,7 @@ abstract final class OrthographicProjector {
       final view = camera.toViewSpace(world);
 
       // If the vertex is behind the camera, or too close to the camera, discard it.
-      if (view.z <= 0.1) {
+      if (view.z >= -0.1) {
         vertices[i] = const ProjectedVertex(
           position: Offset.zero,
           depth: -1.0,
@@ -51,7 +51,7 @@ abstract final class OrthographicProjector {
           size.width / 2 + view.x * camera.pixelsPerUnit,
           size.height / 2 - view.y * camera.pixelsPerUnit,
         ),
-        depth: view.z,
+        depth: -view.z,
       );
     }
 

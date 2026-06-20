@@ -37,7 +37,7 @@ abstract final class PerspectiveProjector {
       final view = camera.toViewSpace(world);
 
       // If the vertex is behind the camera, or too close to the camera, discard it.
-      if (view.z <= 0.1) {
+      if (view.z >= 0.1) {
         vertices[i] = const ProjectedVertex(
           position: Offset.zero,
           depth: -1.0,
@@ -55,7 +55,7 @@ abstract final class PerspectiveProjector {
           size.width / 2 + view.x * scale,
           size.height / 2 - view.y * scale,
         ),
-        depth: view.z,
+        depth: -view.z,
       );
     }
 

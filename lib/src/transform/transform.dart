@@ -200,4 +200,22 @@ class Transform {
       _scale,
     );
   }
+
+  /// Replaces the current transform by decomposing a transformation matrix.
+  /// 
+  /// The matrix is decomposed into translation, rotation, and scale components, which are then stored as the local
+  /// transform state.
+  /// 
+  /// Rotation is normalized to ensure a valid unit quaternion after decomposition.
+  set matrix(Matrix4 value) {
+    final translation = Vector3.zero();
+    final rotation = Quaternion.identity();
+    final scale = Vector3.zero();
+
+    value.decompose(translation, rotation, scale);
+
+    _translation = translation;
+    _rotation = rotation.normalized();
+    _scale = scale;
+  }
 }

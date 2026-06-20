@@ -1,13 +1,19 @@
+import 'dart:math' as math;
+
 import 'package:vector_math/vector_math_64.dart';
 
+import '../geometry/bounding_sphere.dart';
+
 import '../transform/transform.dart';
+
+import '../scene/figure.dart';
 
 /// Represents a node within a 3D scene graph.
 ///
 /// Nodes can be organized hierarchically, allowing transformations to propagate from parent nodes to their descendants.
 ///
 /// A node may act as a pivot, grouping container, or base class for scene elements such as cameras and figures.
-class Node {
+abstract class Node {
 
   /// The local transformation of this node.
   ///
@@ -69,5 +75,72 @@ class Node {
     if (parent == null) return transform.matrix;
 
     return parent!.worldMatrix * transform.matrix;
+  }
+  
+  /// Returns all vertices of this node hierarchy transformed into world space.
+  ///
+  /// If the node is a [Figure], its local vertices are transformed using the
+  /// world matrix. Child nodes are recursively included.
+  ///
+  /// This is primarily used for bounding volume computation and spatial queries.
+  List<Vector3> get worldVertices {
+    final points = <Vector3> [];
+  
+    if (this is Figure) {
+      final figure = this as Figure;
+      final matrix = worldMatrix;
+  
+      for (final vertex in figure.vertices) {
+        points.add(matrix.transform3(vertex.clone()));
+      }
+    }
+  
+    for (final child in children) {
+      points.addAll(child.worldVertices);
+    }
+  
+    return points;
+  }
+
+  /// Computes a world-space bounding sphere that encloses this node and all its children.
+  /// 
+  /// The sphere is derived from transformed world-space vertices and provides a fast approximation for culling,
+  /// collision detection, and camera framing.
+  /// 
+  /// If no vertices exist, returns a zero-radius sphere at the node's position.
+  BoundingSphere get worldBoundingSphere {
+    final points = worldVertices;
+
+    if (points.isEmpty) {
+      return BoundingSphere(transform.translation, 0.0);
+    }
+
+    // 1. Computes AABB bounds to estimate a stable center point.
+    final minV = Vector3.all(double.infinity);
+    final maxV = Vector3.all(-double.infinity);
+
+    for (final p in points) {
+      if (p.x < minV.x) minV.x = p.x;
+      if (p.y < minV.y) minV.y = p.y;
+      if (p.z < minV.z) minV.z = p.z;
+
+      if (p.x > maxV.x) maxV.x = p.x;
+      if (p.y > maxV.y) maxV.y = p.y;
+      if (p.z > maxV.z) maxV.z = p.z;
+    }
+
+    final center = (minV + maxV) * 0.5;
+
+    double maxSquareRadius = 0.0;
+
+    for (final p in points) {
+      final squareDistance = p.distanceToSquared(center);
+
+      if (squareDistance > maxSquareRadius) {
+        maxSquareRadius = squareDistance;
+      }
+    }
+
+    return BoundingSphere(center, math.sqrt(maxSquareRadius));
   }
 }
