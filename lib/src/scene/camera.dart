@@ -193,14 +193,35 @@ class Camera extends Node {
 
     final up = forward.cross(right).normalized();
 
-    final lookAtBasis = Matrix3.columns(right, up, -forward);
+    // Builds an orthonormal basis (local coordinate system) from the lookAt vectors.
+    //
+    // This basis represents the desired orientation of the object in world space:
+    //
+    //   `X`: Right direction;
+    //   `Y`: Up direction;
+    //   `Z`: Forward direction (negated due to -Z forward convention).
+    final lookAtBasis = Matrix3.columns(
+      right,
+      up,
+      -forward,
+    );
+
+    // Converts the basis matrix into a quaternion representation.
+    //
+    // Quaternions are used for the final transform because they are more stabl for interpolation, composition, and
+    // avoid gimbal lock.
     final worldRotation = Quaternion.fromRotation(lookAtBasis);
-    final lookAtWorldMatrix = Matrix4.compose(eye, worldRotation, transform.scale);
+
+    final lookAtWorldMatrix = Matrix4.compose(
+      eye,
+      worldRotation,
+      transform.scale,
+    );
 
     // Converts the world transform into local space.
     if (parent != null) {
-      final parentInverse = parent!.worldMatrix.clone()..invert();
-      final localMatrix = parentInverse * lookAtWorldMatrix;
+      final parentInverseMatrix = parent!.worldMatrix.clone()..invert();
+      final localMatrix = parentInverseMatrix * lookAtWorldMatrix;
 
       transform.matrix = localMatrix;
     }
