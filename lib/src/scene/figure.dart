@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:vector_math/vector_math_64.dart';
 
+import '../geometry/aabb.dart';
 import '../geometry/face.dart';
 
 import '../scene/node.dart';
@@ -44,6 +45,35 @@ class Figure extends Node {
     required this.uvs,
     this.texture,
   });
+
+  /// Computes the local-space Axis-Aligned Bounding Box (AABB) of the figure.
+  ///
+  /// The returned bounds are derived directly from the figure's vertex positions without applying any node or parent
+  /// transformations.
+  ///
+  /// This means the resulting AABB is expressed entirely in the figure's local coordinate space.
+  AABB get bounds {
+    if (vertices.isEmpty) return AABB.zero();
+
+    double minX = double.infinity; double maxX = -double.infinity;
+    double minY = double.infinity; double maxY = -double.infinity;
+    double minZ = double.infinity; double maxZ = -double.infinity;
+
+    for (final vertex in vertices) {
+      if (vertex.x < minX) minX = vertex.x;
+      if (vertex.y < minY) minY = vertex.y;
+      if (vertex.z < minZ) minZ = vertex.z;
+
+      if (vertex.x > maxX) maxX = vertex.x;
+      if (vertex.y > maxY) maxY = vertex.y;
+      if (vertex.z > maxZ) maxZ = vertex.z;
+    }
+
+    return AABB(
+      min: Vector3(minX, minY, minZ),
+      max: Vector3(maxX, maxY, maxZ),
+    );
+  }
 
   /// Re-centers the figure's local pivot using the center of its Axis-Aligned Bounding Box (AABB). All vertices are
   /// translated so that the AABB center becomes the local origin `(0, 0, 0)`.

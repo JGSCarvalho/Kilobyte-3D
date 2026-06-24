@@ -206,15 +206,10 @@ class Camera extends Node {
       -forward,
     );
 
-    // Converts the basis matrix into a quaternion representation.
-    //
-    // Quaternions are used for the final transform because they are more stabl for interpolation, composition, and
-    // avoid gimbal lock.
-    final worldRotation = Quaternion.fromRotation(lookAtBasis);
-
+    // Converts the `lookAt` basis into a world transform.
     final lookAtWorldMatrix = Matrix4.compose(
       eye,
-      worldRotation,
+      Quaternion.fromRotation(lookAtBasis),
       transform.scale,
     );
 

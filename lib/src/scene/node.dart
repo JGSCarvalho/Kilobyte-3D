@@ -115,7 +115,7 @@ abstract class Node {
       return BoundingSphere(transform.translation, 0.0);
     }
 
-    // 1. Computes AABB bounds to estimate a stable center point.
+    // Computes AABB bounds to estimate a stable center point.
     final minV = Vector3.all(double.infinity);
     final maxV = Vector3.all(-double.infinity);
 
