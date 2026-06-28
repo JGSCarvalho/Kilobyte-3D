@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../geometry/projected_geometry.dart';
 
+import '../geometry/render_polygon.dart';
 import '../rendering/orthographic_projector.dart';
 import '../rendering/perspective_projector.dart';
 import '../rendering/projection_mode.dart';
@@ -14,10 +15,14 @@ import '../scene/figure.dart';
 import '../scene/node.dart';
 import '../scene/scene.dart';
 
+import 'wireframe_renderer.dart';
+
 /// Renders a scene using textured polygon surfaces.
 ///
-/// The [TexturedPainter] traverses the scene graph, projects visible figures into screen-space, performs optional
-/// back-face culling, and rasterizes textured polygons through Flutter's vertex rendering API.
+/// The [TexturedPainter] traverses the scene graph, projects visible figures
+/// into screen-space, collects all projected polygons into a global render
+/// queue, sorts them using Painter's Algorithm, and rasterizes them in
+/// back-to-front order.
 ///
 /// Figures rendered by this painter must provide valid UV coordinates.
 class TexturedPainter extends CustomPainter {
@@ -39,28 +44,72 @@ class TexturedPainter extends CustomPainter {
 
     if (camera == null) return;
 
-    _render(
+    final queue = <RenderPolygon> [];
+
+    _collect(
       node: scene,
-      canvas: canvas,
       size: size,
       camera: camera,
+      queue: queue,
     );
+
+    // Global Painter's Algorithm sorting.
+    queue.sort(
+      (a, b) => b.projectedFace.depth.compareTo(a.projectedFace.depth),
+    );
+
+    for (final polygon in queue) {
+      final figure = polygon.figure;
+      final geometry = polygon.geometry;
+      final face = polygon.projectedFace;
+
+      if (figure.texture != null) {
+        final paint = Paint()
+          ..shader = ui.ImageShader(
+            figure.texture!,
+            ui.TileMode.clamp,
+            ui.TileMode.clamp,
+            Matrix4.identity().storage,
+          )
+          ..blendMode = figure.blendMode
+          ..isAntiAlias = false;
+
+        TexturedRenderer.draw(
+          canvas: canvas,
+          geometry: geometry,
+          face: face,
+          texCoords: figure.texCoords,
+          texture: figure.texture!,
+          paint: paint,
+        );
+      }
+      else {
+        final paint = Paint()
+          ..color = const Color(0xFF607D8B)
+          ..strokeWidth = 1.0
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..style = PaintingStyle.stroke;
+
+        WireframeRenderer.draw(
+          canvas: canvas,
+          geometry: geometry,
+          face: face,
+          paint: paint,
+        );
+      }
+    }
   }
 
-  /// Recursively traverses the scene graph and renders all textured figures.
-  void _render({
+  /// Traverses the scene graph and collects projected polygons into the global
+  /// render queue.
+  void _collect({
     required Node node,
-    required Canvas canvas,
     required Size size,
     required Camera camera,
+    required List<RenderPolygon> queue,
   }) {
-    if (node is Figure) {      
-      if (node.texture == null) {
-        assert(node.texture != null, 'Figures must have a texture, provide a texture or change to wireframe mode!');
-
-        return;
-      }
-
+    if (node is Figure) {
       ProjectedGeometry geometry;
 
       if (camera.projectionMode == ProjectionMode.orthographic) {
@@ -78,32 +127,23 @@ class TexturedPainter extends CustomPainter {
         ).cullOffscreen(size);
       }
 
-      if (backfaceCulling) geometry = geometry.cullBackfaces();
-      
-      final paint = Paint()
-        ..shader = ui.ImageShader(
-          node.texture!,
-          ui.TileMode.clamp,
-          ui.TileMode.clamp,
-          Matrix4.identity().storage,
-        )
-        ..style = PaintingStyle.fill;
-      
-      TexturedRenderer.draw(
-        canvas: canvas,
-        geometry: geometry,
-        uvs: node.uvs,
-        texture: node.texture!,
-        paint: paint,
-      );
+      for (final face in geometry.faces) {
+        queue.add(
+          RenderPolygon(
+            figure: node,
+            geometry: geometry,
+            projectedFace: face,
+          ),
+        );
+      }
     }
 
     for (final child in node.children) {
-      _render(
+      _collect(
         node: child,
-        canvas: canvas,
         size: size,
         camera: camera,
+        queue: queue,
       );
     }
   }

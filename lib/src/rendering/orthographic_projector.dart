@@ -68,13 +68,11 @@ abstract final class OrthographicProjector {
   
       faces.add(ProjectedFace(face, depth));
     }
-  
-    faces.sort((a, b) => b.depth.compareTo(a.depth));
 
     return ProjectedGeometry(
       vertices: vertices,
       faces: faces,
-      uvs: figure.uvs,
+      uvs: figure.texCoords,
     );
   }
 }

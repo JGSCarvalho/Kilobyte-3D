@@ -20,9 +20,6 @@ class Figure extends Node {
   /// Each [Face] contains indices referencing vertices from the [vertices] collection.
   List<Face> faces;
 
-  /// The diffuse texture applied to the surface of the figure.
-  ui.Image? texture;
-
   /// The texture coordinate buffer (UV map) for the geometry.
   ///
   /// Each [Vector2] represents a normalized position in texture space (typically ranging from `0.0` to `1.0`) where:
@@ -31,18 +28,29 @@ class Figure extends Node {
   /// - `y` corresponds to the vertical texture axis (V), pre-inverted to align with Flutter's top-left canvas origin.
   ///
   /// Projected faces reference indices within this list to correctly map image textures onto 2D screen fragments.
-  List<Vector2> uvs;
+  List<Vector2> texCoords;
 
   /// The vertices that define the geometry of the figure.
   ///
   /// Vertices are expressed in the figure's local coordinate space before any world-space transformations are applied.
   List<Vector3> vertices;
 
+  /// The texture applied to the surface of the figure.
+  /// 
+  /// If no texture is provided, the figure will be rendered as a wireframe.
+  ui.Image? texture;
+
+  /// The blend mode used when rendering the figure.
+  /// 
+  /// Defaults to [ui.BlendMode.srcOver].
+  ui.BlendMode blendMode;
+
   Figure({
     super.transform,
-    required this.vertices,
     required this.faces,
-    required this.uvs,
+    required this.texCoords,
+    required this.vertices,
+    this.blendMode = ui.BlendMode.srcOver,
     this.texture,
   });
 
@@ -89,8 +97,8 @@ class Figure extends Node {
   void centerPivot([bool keepWorldPosition = false]) {
     if (vertices.isEmpty) return;
 
-    double minX =   double.infinity; double minY =   double.infinity; double minZ =   double.infinity;
-    double maxX = - double.infinity; double maxY = - double.infinity; double maxZ = - double.infinity;
+    double minX =  double.infinity; double minY =  double.infinity; double minZ =  double.infinity;
+    double maxX = -double.infinity; double maxY = -double.infinity; double maxZ = -double.infinity;
 
     for (final vertex in vertices) {
       if (vertex.x < minX) minX = vertex.x;
@@ -172,7 +180,7 @@ class Figure extends Node {
 
     for (int i = 0; i < depth; i++) {
       final subVertices = List<Vector3>.from(vertices);
-      final subUVs = List<Vector2>.from(uvs);
+      final subUVs = List<Vector2>.from(texCoords);
       final subFaces = <Face> [];
   
       for (final face in faces) {
@@ -190,23 +198,13 @@ class Figure extends Node {
         final uv1 = face.vtIndices[1];
         final uv2 = face.vtIndices[2];
   
-        subVertices.add((vertices[p0] + vertices[p1]) * 0.5);
-        final pMidpoint0 = subVertices.length - 1;
+        subVertices.add((vertices[p0] + vertices[p1]) * 0.5); final pMidpoint0 = subVertices.length - 1;
+        subVertices.add((vertices[p1] + vertices[p2]) * 0.5); final pMidpoint1 = subVertices.length - 1;
+        subVertices.add((vertices[p2] + vertices[p0]) * 0.5); final pMidpoint2 = subVertices.length - 1;
   
-        subVertices.add((vertices[p1] + vertices[p2]) * 0.5);
-        final pMidpoint1 = subVertices.length - 1;
-  
-        subVertices.add((vertices[p2] + vertices[p0]) * 0.5);
-        final pMidpoint2 = subVertices.length - 1;
-  
-        subUVs.add((uvs[uv0] + uvs[uv1]) * 0.5);
-        final uvMidpoint0 = subUVs.length - 1;
-  
-        subUVs.add((uvs[uv1] + uvs[uv2]) * 0.5);
-        final uvMidpoint1 = subUVs.length - 1;
-  
-        subUVs.add((uvs[uv2] + uvs[uv0]) * 0.5);
-        final uvMidpoint2 = subUVs.length - 1;
+        subUVs.add((texCoords[uv0] + texCoords[uv1]) * 0.5); final uvMidpoint0 = subUVs.length - 1;
+        subUVs.add((texCoords[uv1] + texCoords[uv2]) * 0.5); final uvMidpoint1 = subUVs.length - 1;
+        subUVs.add((texCoords[uv2] + texCoords[uv0]) * 0.5); final uvMidpoint2 = subUVs.length - 1;
   
         subFaces.addAll([
           Face(
@@ -229,7 +227,7 @@ class Figure extends Node {
       }
 
       vertices = subVertices;
-      uvs = subUVs;
+      texCoords = subUVs;
       faces = subFaces;
     }
   }

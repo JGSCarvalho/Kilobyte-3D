@@ -72,7 +72,7 @@ abstract final class OBJ {
       vertices: vertices,
       faces: faces,
       transform: Transform(),
-      uvs: uvs,
+      texCoords: uvs,
     );
   }
 }

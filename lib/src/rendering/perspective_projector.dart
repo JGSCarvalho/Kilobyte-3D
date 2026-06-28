@@ -72,12 +72,9 @@ abstract final class PerspectiveProjector {
   
       faces.add(ProjectedFace(face, depth));
     }
-  
-    // Painter algorithm (far → near)
-    faces.sort((a, b) => b.depth.compareTo(a.depth));
 
     return ProjectedGeometry(
-      uvs: figure.uvs,
+      uvs: figure.texCoords,
       vertices: vertices,
       faces: faces,
     );
