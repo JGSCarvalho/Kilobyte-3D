@@ -67,8 +67,8 @@ class TexturedPainter extends CustomPainter {
         final paint = Paint()
           ..shader = ui.ImageShader(
             figure.texture!,
-            ui.TileMode.clamp,
-            ui.TileMode.clamp,
+            ui.TileMode.repeated,
+            ui.TileMode.repeated,
             Matrix4.identity().storage,
           )
           ..blendMode = figure.blendMode
