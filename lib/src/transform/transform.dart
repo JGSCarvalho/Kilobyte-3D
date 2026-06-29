@@ -9,7 +9,10 @@ import 'package:vector_math/vector_math_64.dart';
 ///
 /// - `+X`: Right;
 /// - `+Y`: Up;
-/// - `-Z`: Forward.
+/// - `+Z`: Forward.
+///
+/// Rotations are internally represented using unit quaternions in order to avoid gimbal lock and provide stable
+/// interpolation behavior.
 class Transform {
 
   /// Local orientation represented as a quaternion.
@@ -60,8 +63,10 @@ class Transform {
   Vector3 get translation => Vector3.copy(_translation);
 
   /// Returns the local forward direction.
+  ///
+  /// The engine defines forward as the positive Z axis.
   Vector3 get forward {
-    return _rotation.rotated(Vector3(0, 0, -1)).normalized();
+    return _rotation.rotated(Vector3(0, 0, 1)).normalized();
   }
 
   /// Returns the local right direction.
@@ -152,6 +157,14 @@ class Transform {
 
   /// Reorients the transform so that its forward direction points toward the specified target position.
   ///
+  /// The generated orientation follows the engine's right-handed coordinate system where:
+  ///
+  /// - `+X`: Right;
+  /// - `+Y`: Up;
+  /// - `+Z`: Forward.
+  ///
+  /// The resulting basis is orthonormalized before conversion into a quaternion.
+  ///
   /// ---
   ///
   /// ### Parameters:
@@ -165,14 +178,27 @@ class Transform {
     }
   ) {
     final upAxis = worldUp ?? Vector3(0, 1, 0);
-    
+
+    // Computes the forward direction toward the target.
     final forward = (target - _translation).normalized();
-    final right = forward.cross(upAxis).normalized();
-    final up = right.cross(forward).normalized();
 
-    final rotationMatrix = Matrix3.columns(right, up, - forward);
+    // Builds the horizontal axis of the orthonormal basis.
+    Vector3 right = upAxis.cross(forward);
 
-    _rotation = Quaternion.fromRotation(rotationMatrix);
+    // Prevents basis degeneration when the forward direction becomes parallel to the up axis.
+    if (right.length2 < 1e-8) {
+      right = Vector3(1, 0, 0).cross(forward);
+    }
+
+    right.normalize();
+
+    // Recomputes the orthogonal up vector.
+    final up = forward.cross(right).normalized();
+
+    // Builds the rotation basis matrix.
+    final rotationMatrix = Matrix3.columns(right, up, forward);
+
+    _rotation = Quaternion.fromRotation(rotationMatrix).normalized();
   }
 
   /// Replaces the current local scale.
@@ -186,7 +212,7 @@ class Transform {
     _scale = scale;
   }
 
-  /// Builds the local model matrix from translation, rotation, and scale.
+  /// Builds the local transformation matrix.
   ///
   /// The resulting matrix follows:
   ///
@@ -202,17 +228,21 @@ class Transform {
   }
 
   /// Replaces the current transform by decomposing a transformation matrix.
-  /// 
+  ///
   /// The matrix is decomposed into translation, rotation, and scale components, which are then stored as the local
   /// transform state.
-  /// 
+  ///
   /// Rotation is normalized to ensure a valid unit quaternion after decomposition.
   set matrix(Matrix4 value) {
     final translation = Vector3.zero();
     final rotation = Quaternion.identity();
-    final scale = Vector3.zero();
+    final scale = Vector3.all(1);
 
-    value.decompose(translation, rotation, scale);
+    value.decompose(
+      translation,
+      rotation,
+      scale,
+    );
 
     _translation = translation;
     _rotation = rotation.normalized();

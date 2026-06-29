@@ -94,7 +94,7 @@ class Figure extends Node {
   /// 
   /// - [keepWorldPosition]: When enabled, the figure's local translation is adjusted by the same pivot offset so the
   /// figure remains visually stationary in world space.
-  void centerPivot([bool keepWorldPosition = false]) {
+  void center([bool keepWorldPosition = false]) {
     if (vertices.isEmpty) return;
 
     double minX =  double.infinity; double minY =  double.infinity; double minZ =  double.infinity;

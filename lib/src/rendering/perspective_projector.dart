@@ -31,13 +31,20 @@ abstract final class PerspectiveProjector {
     final focalDistance = size.height / (2 * math.tan(camera.fov * math.pi / 360));
     final worldMatrix = figure.worldMatrix;
 
+    // int i = 0;
+
+    // for (final vertex in figure.vertices) {
+    //   i++;
+    //   print('$i: $vertex');
+    // }
+
     for (int i = 0; i < figure.vertices.length; i++) {
       final local = figure.vertices[i];
       final world = worldMatrix.transform3(local.clone());
       final view = camera.toViewSpace(world);
 
       // If the vertex is behind the camera, or too close to the camera, discard it.
-      if (view.z >= 0.1) {
+      if (view.z <= 0.1) {
         vertices[i] = const ProjectedVertex(
           position: Offset.zero,
           depth: -1.0,
@@ -52,10 +59,10 @@ abstract final class PerspectiveProjector {
 
       vertices[i] = ProjectedVertex(
         position: Offset(
-          size.width / 2 + view.x * scale,
+          size.width / 2 - view.x * scale,
           size.height / 2 - view.y * scale,
         ),
-        depth: -view.z,
+        depth: view.z,
       );
     }
 

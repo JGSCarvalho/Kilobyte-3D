@@ -14,6 +14,12 @@ import '../transform/transform.dart';
 ///
 /// It provides the view transformation required to convert world-space coordinates into view-space coordinates before
 /// projection onto the screen.
+///
+/// The engine uses a right-handed coordinate system:
+///
+/// - `+X`: Right;
+/// - `+Y`: Up;
+/// - `+Z`: Forward.
 class Camera extends Node {
 
   /// Vertical field of view expressed in degrees.
@@ -74,7 +80,7 @@ class Camera extends Node {
   }
 
   /// Converts a world-space coordinate into view-space.
-  /// 
+  ///
   /// ---
   ///
   /// ### Parameters:
@@ -112,13 +118,13 @@ class Camera extends Node {
 
     // Current camera forward direction in world space.
     //
-    // The engine uses -Z as forward, therefore the third matrix column represents the backward axis and must be
-    // negated.
-    final forward = -(transform.matrix.getColumn(2).xyz)..normalize();
+    // In the engine coordinate system the third matrix column already represents the forward axis (+Z).
+    final forward = transform.matrix.getColumn(2).xyz.normalized();
 
     if (projectionMode == ProjectionMode.perspective) {
       final halfFovV = (fov / 2.0) * math.pi / 180.0;
-      final halfFovH = math.atan(math.tan(halfFovV) * viewportWidth);
+      final aspect = viewportWidth / viewportHeight;
+      final halfFovH = math.atan(math.tan(halfFovV) * aspect);
 
       // Uses the most restrictive visible angle to ensure that the entire sphere remains inside the viewport.
       final minFov = math.min(halfFovV, halfFovH);
@@ -134,7 +140,7 @@ class Camera extends Node {
       pixelsPerUnit = viewportHeight / requiredWorldHeight;
 
       // Orthographic projection does not depend on distance for scale, therefore the camera is simply offset for
-      // stable visibility.
+      //stable visibility.
       final distance = sphere.radius + 10.0;
       final position = sphere.center - (forward * distance);
 
@@ -153,7 +159,7 @@ class Camera extends Node {
   ///
   /// - `+X`: Right;
   /// - `+Y`: Up;
-  /// - `-Z`: Forward.
+  /// - `+Z`: Forward.
   ///
   /// ---
   ///
@@ -169,19 +175,15 @@ class Camera extends Node {
 
     final upAxis = Vector3(0, 1, 0);
 
-    // Prevents the `lookAt` operation when the target position is extremely close to the current position.
-    //
-    // In this situation the direction vector becomes nearly zero:
-    //
-    //   target - eye ~= (0, 0, 0)
-    //
-    // Normalizing a zero-length vector would produce an invalid orientation containing NaN values.
+    // Prevents the `lookAt` operation when the target position becomes too close to the camera position.
     if ((target - eye).length2 < 1e-8) {
       return;
     }
 
+    // Computes the forward viewing direction.
     final forward = (target - eye).normalized();
 
+    // Builds the orthonormal basis horizontal axis.
     Vector3 right = upAxis.cross(forward);
 
     // Prevents basis degeneration when the forward direction becomes parallel to the up axis.
@@ -191,25 +193,16 @@ class Camera extends Node {
 
     right.normalize();
 
+    // Recomputes the orthogonal up vector.
     final up = forward.cross(right).normalized();
 
-    // Builds an orthonormal basis (local coordinate system) from the lookAt vectors.
-    //
-    // This basis represents the desired orientation of the object in world space:
-    //
-    //   `X`: Right direction;
-    //   `Y`: Up direction;
-    //   `Z`: Forward direction (negated due to -Z forward convention).
-    final lookAtBasis = Matrix3.columns(
-      right,
-      up,
-      -forward,
-    );
+    // Builds the orthonormal lookAt basis.
+    final lookAtBasis = Matrix3.columns(right, up, forward);
 
-    // Converts the `lookAt` basis into a world transform.
+    // Converts the lookAt basis into a world transform.
     final lookAtWorldMatrix = Matrix4.compose(
       eye,
-      Quaternion.fromRotation(lookAtBasis),
+      Quaternion.fromRotation(lookAtBasis).normalized(),
       transform.scale,
     );
 
