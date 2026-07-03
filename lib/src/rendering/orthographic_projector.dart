@@ -1,79 +1,127 @@
 import 'dart:ui';
 
-import '../geometry/projected_face.dart';
-import '../geometry/projected_geometry.dart';
-import '../geometry/projected_vertex.dart';
+import 'package:vector_math/vector_math_64.dart';
 
-import '../scene/camera.dart';
-import '../scene/figure.dart';
+import '../../kilobyte_3d.dart';
 
-/// Projects geometry using an orthographic projection model.
-///
-/// In orthographic projection, depth (Z) has no influence on scale: parallel lines remain parallel in screen-space.
+import '../geometry/geometry_2d.dart';
+
+/// Projects 3D geometry into 2D screen-space.
 abstract final class OrthographicProjector {
 
-  /// Projects a figure into 2D screen-space using orthographic projection.
+  /// Projects a runtime [Mesh] into reusable screen-space geometry buffers.
+  ///
+  /// The projection result is written directly into [geometry], avoiding per-frame allocations during rendering.
   ///
   /// ---
   ///
-  /// ### Parameters:
+  /// ## Parameters
   ///
-  /// - [camera]: Camera providing view transform and scale factor.
-  /// - [figure]: Mesh to be projected.
-  /// - [size]: Viewport dimensions.
-  static ProjectedGeometry project({
+  /// - [camera]: Camera used to convert world-space into view-space.
+  /// - [mesh]: Runtime-oriented indexed geometry to project.
+  /// - [size]: Target viewport size in screen-space pixels.
+  /// - [worldMatrix]: World transformation applied to the mesh.
+  /// - [geometry]: Mutable output geometry buffer.
+  /// - [backfaceCulling]: Enables screen-space backface rejection.
+  /// - [nearPlane]: Minimum visible depth threshold.
+  static void project({
     required Camera camera,
-    required Figure figure,
+    required Mesh mesh,
     required Size size,
+    required Matrix4 worldMatrix,
+    required Geometry2D geometry,
+    bool backfaceCulling = true,
+    double nearPlane = 0.01,
   }) {
-    final vertices = List<ProjectedVertex>.filled(figure.vertices.length, const ProjectedVertex());
-    final worldMatrix = figure.worldMatrix;
+    final projectedVertices = geometry.screenVertices;
 
-    for (int i = 0; i < figure.vertices.length; i++) {
-      final local = figure.vertices[i];
-      final world = worldMatrix.transform3(local.clone());
-      final view = camera.toViewSpace(world);
+    final vertexDepths = geometry.vertexDepths;
+    final triDepths = geometry.triangleDepths;
 
+    final triVisibility = geometry.triangleVisibility;
 
-      // If the vertex is behind the camera, or too close to the camera, discard it.
-      if (view.z <= -0.1) {
-        vertices[i] = const ProjectedVertex(
-          position: Offset.zero,
-          depth: -1.0,
-        );
-        
+    final halfWidth = size.width * 0.5;
+    final halfHeight = size.height * 0.5;
+
+    final ppu = camera.pixelsPerUnit;
+
+    final localPosition = Vector3.zero();
+    final worldPosition = Vector3.zero();
+
+    // The actual vertex projection to 2D screen-space happens here.
+    for (int i = 0; i < mesh.vertexCount; i++) {
+      final inputOffset = i * 5;
+      final outputOffset = i * 2;
+
+      localPosition.x = mesh.vertices[inputOffset];
+      localPosition.y = mesh.vertices[inputOffset + 1];
+      localPosition.z = mesh.vertices[inputOffset + 2];
+
+      worldMatrix.transformed3(localPosition, worldPosition);
+
+      final viewPosition = camera.toViewSpace(worldPosition);
+
+      vertexDepths[i] = viewPosition.z;
+
+      projectedVertices[outputOffset] = halfWidth + (viewPosition.x * ppu);
+      projectedVertices[outputOffset + 1] = halfHeight - (viewPosition.y * ppu);
+    }
+
+    for (int t = 0; t < mesh.triCount; t++) {
+      final base = t * 3;
+
+      final i0 = mesh.indices[base];
+      final i1 = mesh.indices[base + 1];
+      final i2 = mesh.indices[base + 2];
+
+      final z0 = vertexDepths[i0];
+      final z1 = vertexDepths[i1];
+      final z2 = vertexDepths[i2];
+
+      // Skip triangles that are behind the camera.
+      if (z0 <= nearPlane && z1 <= nearPlane && z2 <= nearPlane) {
+        triVisibility[t] = 0;
+
         continue;
       }
 
-      // Orthographic projection ignores depth, preserving the apparent size of objects regardless of their distance
-      // from the camera.
-      vertices[i] = ProjectedVertex(
-        position: Offset(
-          size.width / 2 - view.x * camera.pixelsPerUnit,
-          size.height / 2 - view.y * camera.pixelsPerUnit,
-        ),
-        depth: view.z,
-      );
-    }
+      triDepths[t] = (z0 + z1 + z2) / 3.0;
 
-    final faces = <ProjectedFace> [];
+      // Screen-space winding becomes unstable when crossing the near plane.
+      //
+      // In this case we skip backface culling.
+      if (z0 <= nearPlane || z1 <= nearPlane || z2 <= nearPlane) {
 
-    for (final face in figure.faces) {
-      double depth = 0;
-  
-      for (final index in face.vIndices) {
-        depth += vertices[index].depth;
+        triVisibility[t] = 1;
+
+        continue;
       }
-  
-      depth /= face.vIndices.length;
-  
-      faces.add(ProjectedFace(face, depth));
-    }
 
-    return ProjectedGeometry(
-      vertices: vertices,
-      faces: faces,
-      uvs: figure.texCoords,
-    );
+      // TODO: Implement backface culling by Figure material.
+      if (false) {
+        final v0 = i0 * 2;
+        final v1 = i1 * 2;
+        final v2 = i2 * 2;
+
+        final x0 = projectedVertices[v0];     final x1 = projectedVertices[v1];     final x2 = projectedVertices[v2];
+        final y0 = projectedVertices[v0 + 1]; final y1 = projectedVertices[v1 + 1]; final y2 = projectedVertices[v2 + 1];
+
+        final cross = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
+
+        // Avoid division by zero, which can happen when the triangle is degenerate.
+        if (cross.abs() < 1e-6) {
+          triVisibility[t] = 0;
+
+          continue;
+        }
+
+        // Flutter screen-space uses inverted Y, so clockwise winding is front-facing.
+        triVisibility[t] = cross > 0.0 ? 1 : 0;
+      }
+
+      else {
+        triVisibility[t] = 1;
+      }
+    }
   }
 }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../rendering/render_clock.dart';
-import '../rendering/render_mode.dart';
 import '../rendering/textured_painter.dart';
 
 import '../scene/scene.dart';
@@ -24,8 +23,6 @@ class Kilobyte3D extends StatefulWidget {
   /// The desired viewport size.
   final Size size;
 
-  final bool backfaceCulling;
-
   /// Creates a 3D viewport.
   ///
   /// ---
@@ -33,14 +30,12 @@ class Kilobyte3D extends StatefulWidget {
   /// ### Parameters:
   ///
   /// - [scene]: The scene graph to render.
-  /// - [mode]: The active rendering mode.
   /// - [fps]: The target rendering frame rate.
   /// - [size]: Optional fixed viewport dimensions.
   const Kilobyte3D({
     super.key,
     required this.scene,
     required this.size,
-    this.backfaceCulling = true,
     this.fps = 30,
   });
 
@@ -77,7 +72,6 @@ class _Kilobyte3DState extends State<Kilobyte3D> {
             painter: TexturedPainter(
               repaint: _clock,
               scene: widget.scene,
-              backfaceCulling: widget.backfaceCulling,
             ),
           ),
         ),

@@ -71,7 +71,6 @@ abstract final class OBJ {
     return Figure(
       vertices: vertices,
       faces: faces,
-      transform: Transform(),
       texCoords: uvs,
     );
   }

@@ -1,9 +1,13 @@
+import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:vector_math/vector_math_64.dart';
 
 import '../geometry/aabb.dart';
 import '../geometry/face.dart';
+import '../geometry/geometry_2d.dart';
+import '../geometry/mesh.dart';
 
 import '../scene/node.dart';
 
@@ -14,6 +18,16 @@ import '../scene/node.dart';
 /// As a [Node], it inherits hierarchical transformations and can be positioned, rotated, and scaled relative to its
 /// parent.
 class Figure extends Node {
+
+  /// Compact runtime-oriented mesh optimized for rendering. 
+  /// 
+  /// This mesh stores geometry using tightly packed typed buffers for fast projection and rasterization.
+  /// 
+  /// Unlike [faces], [vertices], and [texCoords], which preserve editable high-level geometry data, [mesh] is intended
+  /// for direct consumption by the rendering pipeline.
+  /// 
+  /// The runtime mesh should be rebuilt whenever geometric topology or vertex data changes.
+  Mesh mesh;
 
   /// The faces that define the surface topology of the figure.
   ///
@@ -45,14 +59,54 @@ class Figure extends Node {
   /// Defaults to [ui.BlendMode.srcOver].
   ui.BlendMode blendMode;
 
-  Figure({
-    super.transform,
+  Figure._({
     required this.faces,
     required this.texCoords,
     required this.vertices,
+    required this.mesh,
     this.blendMode = ui.BlendMode.srcOver,
     this.texture,
   });
+
+  factory Figure({
+    required List<Face> faces,
+    required List<Vector2> texCoords,
+    required List<Vector3> vertices,
+    ui.Image? texture,
+    ui.BlendMode blendMode = ui.BlendMode.srcOver,
+  }) {
+    return Figure._(
+      faces: faces,
+      texCoords: texCoords,
+      vertices: vertices,
+      mesh: Mesh.fromFigure(faces, texCoords, vertices),
+      texture: texture,
+      blendMode: blendMode,
+    );
+  }
+
+  late Geometry2D geometry = Geometry2D.allocate(
+    vertexCount: mesh.vertexCount,
+    triCount: mesh.triCount,
+  );
+
+  ui.Paint? _paint;
+
+  ui.Paint get paint {
+    return _paint ??= ui.Paint()
+      ..shader = ui.ImageShader(
+        texture!,
+        ui.TileMode.repeated,
+        ui.TileMode.repeated,
+        Float64List.fromList([
+          1, 0, 0, 0,
+          0, 1, 0, 0,
+          0, 0, 1, 0,
+          0, 0, 0, 1,
+        ])
+      )
+      ..blendMode = blendMode;
+  }
 
   /// Computes the local-space Axis-Aligned Bounding Box (AABB) of the figure.
   ///
@@ -157,7 +211,7 @@ class Figure extends Node {
   ///
   /// This produces 4 new triangles:
   /// 
-  /// ```txt
+  /// ``` txt
   ///        v0                  m1                  m2                  m1
   ///       /  \                /  \                /  \                /  \
   ///      /    \              /    \              /    \              /    \
@@ -176,59 +230,257 @@ class Figure extends Node {
   ///
   /// - Complexity grows as O(4^n), where n is the subdivision depth, use carefully.
   void subdivide([int depth = 1]) {
-    assert(depth > 0 || depth <= 3, 'Subdivision depth must be greater than 0 and less than or equal to 3!');
+    if (depth <= 0) return;
 
     for (int i = 0; i < depth; i++) {
-      final subVertices = List<Vector3>.from(vertices);
-      final subUVs = List<Vector2>.from(texCoords);
-      final subFaces = <Face> [];
+      final subdividedVertices = List<Vector3>.from(vertices);
+      final subdividedTexCoords = List<Vector2>.from(texCoords);
+      final subdividedFaces = <Face> [];
   
       for (final face in faces) {
         if (face.vIndices.length != 3) {
-          subFaces.add(face);
+          subdividedFaces.add(face);
   
           continue;
         }
   
-        final p0 = face.vIndices[0];
-        final p1 = face.vIndices[1];
-        final p2 = face.vIndices[2];
+        final vertex0 = face.vIndices[0]; final texCoord0 = face.vtIndices[0];
+        final vertex1 = face.vIndices[1]; final texCoord1 = face.vtIndices[1];
+        final vertex2 = face.vIndices[2]; final texCoord2 = face.vtIndices[2];
   
-        final uv0 = face.vtIndices[0];
-        final uv1 = face.vtIndices[1];
-        final uv2 = face.vtIndices[2];
+        subdividedVertices.add((vertices[vertex0] + vertices[vertex1]) * 0.5); final vertexMidpoint0 = subdividedVertices.length - 1;
+        subdividedVertices.add((vertices[vertex1] + vertices[vertex2]) * 0.5); final vertexMidpoint1 = subdividedVertices.length - 1;
+        subdividedVertices.add((vertices[vertex2] + vertices[vertex0]) * 0.5); final vertexMidpoint2 = subdividedVertices.length - 1;
   
-        subVertices.add((vertices[p0] + vertices[p1]) * 0.5); final pMidpoint0 = subVertices.length - 1;
-        subVertices.add((vertices[p1] + vertices[p2]) * 0.5); final pMidpoint1 = subVertices.length - 1;
-        subVertices.add((vertices[p2] + vertices[p0]) * 0.5); final pMidpoint2 = subVertices.length - 1;
+        subdividedTexCoords.add((texCoords[texCoord0] + texCoords[texCoord1]) * 0.5); final texCoordMidpoint0 = subdividedTexCoords.length - 1;
+        subdividedTexCoords.add((texCoords[texCoord1] + texCoords[texCoord2]) * 0.5); final texCoordMidpoint1 = subdividedTexCoords.length - 1;
+        subdividedTexCoords.add((texCoords[texCoord2] + texCoords[texCoord0]) * 0.5); final texCoordMidpoint2 = subdividedTexCoords.length - 1;
   
-        subUVs.add((texCoords[uv0] + texCoords[uv1]) * 0.5); final uvMidpoint0 = subUVs.length - 1;
-        subUVs.add((texCoords[uv1] + texCoords[uv2]) * 0.5); final uvMidpoint1 = subUVs.length - 1;
-        subUVs.add((texCoords[uv2] + texCoords[uv0]) * 0.5); final uvMidpoint2 = subUVs.length - 1;
-  
-        subFaces.addAll([
+        subdividedFaces.addAll([
           Face(
-            vIndices: [p0, pMidpoint0, pMidpoint2],
-            vtIndices: [uv0, uvMidpoint0, uvMidpoint2],
+            vIndices: [vertex0, vertexMidpoint0, vertexMidpoint2],
+            vtIndices: [texCoord0, texCoordMidpoint0, texCoordMidpoint2],
           ),
           Face(
-            vIndices: [pMidpoint0, p1, pMidpoint1],
-            vtIndices: [uvMidpoint0, uv1, uvMidpoint1],
+            vIndices: [vertexMidpoint0, vertex1, vertexMidpoint1],
+            vtIndices: [texCoordMidpoint0, texCoord1, texCoordMidpoint1],
           ),
           Face(
-            vIndices: [pMidpoint2, pMidpoint1, p2],
-            vtIndices: [uvMidpoint2, uvMidpoint1, uv2],
+            vIndices: [vertexMidpoint2, vertexMidpoint1, vertex2],
+            vtIndices: [texCoordMidpoint2, texCoordMidpoint1, texCoord2],
           ),
           Face(
-            vIndices: [pMidpoint0, pMidpoint1, pMidpoint2],
-            vtIndices: [uvMidpoint0, uvMidpoint1, uvMidpoint2],
+            vIndices: [vertexMidpoint0, vertexMidpoint1, vertexMidpoint2],
+            vtIndices: [texCoordMidpoint0, texCoordMidpoint1, texCoordMidpoint2],
           ),
         ]);
       }
 
-      vertices = subVertices;
-      texCoords = subUVs;
-      faces = subFaces;
+      vertices = subdividedVertices;
+      texCoords = subdividedTexCoords;
+      faces = subdividedFaces;
+      mesh = Mesh.fromFigure(faces, texCoords, vertices);
+    }
+  }
+
+  /// Subdivides triangle geometry using shared-edge midpoint caching to reduce duplicate vertices and preserve mesh
+  /// continuity.
+  ///
+  /// Unlike [subdivide], this method performs topology-aware subdivision by reusing midpoint vertices across adjacent
+  /// triangles that share the same edge.
+  ///
+  /// This significantly reduces vertex duplication, lowers memory overhead, improves vertex cache locality, and
+  /// prevents cracks between neighboring subdivided faces.
+  ///
+  /// UV coordinates are subdivided using the same shared-edge interpolation strategy, preserving texture continuity
+  /// across the mesh surface.
+  ///
+  /// ---
+  ///
+  /// ### Algorithm:
+  ///
+  /// Each triangle is subdivided into four smaller triangles using midpoint interpolation:
+  ///
+  /// ``` txt
+  ///        v0
+  ///       /  \
+  ///      m2--m1
+  ///     / \  / \
+  ///   v2---m3---v1
+  /// ```
+  ///
+  /// Where:
+  ///
+  /// - `m1` is the midpoint of edge `(v0, v1)`;
+  /// - `m2` is the midpoint of edge `(v1, v2)`;
+  /// - `m3` is the midpoint of edge `(v2, v0)`.
+  ///
+  /// This produces four new triangles:
+  ///
+  /// ``` txt
+  ///        v0                  m1                  m2                  m1
+  ///       /  \                /  \                /  \                /  \
+  ///      /    \              /    \              /    \              /    \
+  ///    m2------m1          m2------v1          v2------m3          m2------m3
+  /// ```
+  ///
+  /// ---
+  ///
+  /// ### Parameters:
+  ///
+  /// - [depth]: Number of subdivision iterations to apply.
+  ///
+  /// ---
+  ///
+  /// ### Notes:
+  ///
+  /// - Complexity grows approximately as O(4^n), where `n` is the subdivision depth.
+  /// - Compared to [subdivide], this method produces significantly fewer duplicated vertices.
+  /// - Midpoints are cached using edge hashes so that adjacent triangles sharing the same edge also share the same
+  /// generated midpoint vertex, avoiding generating duplicated vertices for neighboring faces and ensures
+  /// topological consistency across the subdivided mesh.
+  /// - Faces that collapse into zero-area triangles due to duplicated indices are automatically discarded during
+  /// subdivision.
+  void smartSubdivide([int depth = 1]) {
+    if (depth <= 0) return;
+
+    /// Generates a deterministic hash key for an undirected edge.
+    ///
+    /// The two vertex indices are normalized into ascending order before the hash is constructed, ensuring that edges
+    /// `(a, b)` and `(b, a)` produce the exact same key.
+    ///
+    /// This allows shared triangle edges to consistently reuse the same cached midpoint vertices and UV coordinates
+    /// during subdivision.
+    ///
+    /// ---
+    ///
+    /// ### Parameters:
+    ///
+    /// - [a]: Index of the first vertex.
+    /// - [b]: Index of the second vertex.
+    ///
+    /// ---
+    ///
+    /// ### Notes:
+    ///
+    /// - This implementation assumes vertex indices remain within 16-bit range (`0 - 65535`).
+    /// - The edge is treated as undirected, meaning edge winding order does not affect the generated hash.
+    int edgeKey(int a, int b) {
+      final minIndex = math.min(a, b);
+      final maxIndex = math.max(a, b);
+
+      return (minIndex << 16) | maxIndex;
+    }
+
+    for (int i = 0; i < depth; i++) {
+      final vertexMidpointCache = <int, int> {};
+      final texCoordsMidpointCache = <int, int> {};
+
+      final subdividedVertices = List<Vector3>.from(vertices);
+      final subdividedTexCoords = List<Vector2>.from(texCoords);
+      final subdividedFaces = <Face> [];
+
+      for (final face in faces) {
+        if (face.vIndices.length != 3) {
+          subdividedFaces.add(face);
+
+          continue;
+        }
+
+        final vertex0 = face.vIndices[0]; final texCoord0 = face.vtIndices[0];
+        final vertex1 = face.vIndices[1]; final texCoord1 = face.vtIndices[1];
+        final vertex2 = face.vIndices[2]; final texCoord2 = face.vtIndices[2];
+
+        /// Retrieves or creates the shared midpoint vertex for an edge.
+        ///
+        /// The edge is identified using a deterministic hash generated from the two vertex indices, ensuring that
+        /// adjacent triangles referencing the same edge reuse the exact same midpoint vertex.
+        ///
+        /// If the midpoint already exists in the cache, its index is returned immediately.
+        ///
+        /// Otherwise, a new midpoint position is generated through linear interpolation and appended to the subdivision
+        /// vertex buffer.
+        ///
+        /// ---
+        ///
+        /// ### Parameters:
+        ///
+        /// - [a]: Index of the first vertex.
+        /// - [b]: Index of the second vertex.
+        int getMidpointVertex(int a, int b) {
+          final key = edgeKey(a, b);
+
+          return vertexMidpointCache.putIfAbsent(key, () {
+            subdividedVertices.add((subdividedVertices[a] + subdividedVertices[b]) * 0.5);
+
+            return subdividedVertices.length - 1;
+          });
+        }
+
+        /// Retrieves or creates the shared midpoint UV coordinate for an edge.
+        ///
+        /// Similar to vertex, UV midpoint coordinates are cached using the edge hash so neighboring subdivided
+        /// triangles preserve continuous texture mapping across shared edges.
+        ///
+        /// If a midpoint UV already exists for the edge, its index is reused.
+        ///
+        /// Otherwise, a new UV coordinate is generated using linear interpolation between the two source texture
+        /// coordinates.
+        ///
+        /// ---
+        ///
+        /// ### Parameters:
+        ///
+        /// - [a]: Index of the first texture coordinate.
+        /// - [b]: Index of the second texture coordinate.
+        int getMidpointTexCoord(int a, int b) {
+          final key = edgeKey(a, b);
+
+          return texCoordsMidpointCache.putIfAbsent(
+            key,
+            () {
+              subdividedTexCoords.add((subdividedTexCoords[a] + subdividedTexCoords[b]) * 0.5);
+
+              return subdividedTexCoords.length - 1;
+            }
+          );
+        }
+
+        final vertexMidpoint0 = getMidpointVertex(vertex0, vertex1); final texCoordMidpoint0 = getMidpointTexCoord(texCoord0, texCoord1);
+        final vertexMidpoint1 = getMidpointVertex(vertex1, vertex2); final texCoordMidpoint1 = getMidpointTexCoord(texCoord1, texCoord2);
+        final vertexMidpoint2 = getMidpointVertex(vertex2, vertex0); final texCoordMidpoint2 = getMidpointTexCoord(texCoord2, texCoord0);
+
+        final newFaces = [
+          Face(
+            vIndices: [vertex0, vertexMidpoint0, vertexMidpoint2],
+            vtIndices: [texCoord0, texCoordMidpoint0, texCoordMidpoint2]
+          ),
+          Face(
+            vIndices: [vertexMidpoint0, vertex1, vertexMidpoint1],
+            vtIndices: [texCoordMidpoint0, texCoord1, texCoordMidpoint1],
+          ),
+          Face(
+            vIndices: [vertexMidpoint2, vertexMidpoint1, vertex2],
+            vtIndices: [texCoordMidpoint2, texCoordMidpoint1, texCoord2],
+          ),
+          Face(
+            vIndices: [vertexMidpoint0, vertexMidpoint1, vertexMidpoint2],
+            vtIndices: [texCoordMidpoint0, texCoordMidpoint1, texCoordMidpoint2],
+          ),
+        ];
+
+        // Cleans up faces that collapse to zero-area triangles (degenerate ones).
+        for (final f in newFaces) {
+          if (f.vIndices[0] != f.vIndices[1] && f.vIndices[1] != f.vIndices[2] && f.vIndices[0] != f.vIndices[2]) {
+            subdividedFaces.add(f);
+          }
+        }
+      }
+
+      vertices = subdividedVertices;
+      texCoords = subdividedTexCoords;
+      faces = subdividedFaces;
+      mesh = Mesh.fromFigure(faces, texCoords, vertices);
     }
   }
 }

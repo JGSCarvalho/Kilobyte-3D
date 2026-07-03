@@ -119,26 +119,24 @@ abstract class Node {
     final minV = Vector3.all(double.infinity);
     final maxV = Vector3.all(-double.infinity);
 
-    for (final p in points) {
-      if (p.x < minV.x) minV.x = p.x;
-      if (p.y < minV.y) minV.y = p.y;
-      if (p.z < minV.z) minV.z = p.z;
+    for (final point in points) {
+      if (point.x < minV.x) minV.x = point.x;
+      if (point.y < minV.y) minV.y = point.y;
+      if (point.z < minV.z) minV.z = point.z;
 
-      if (p.x > maxV.x) maxV.x = p.x;
-      if (p.y > maxV.y) maxV.y = p.y;
-      if (p.z > maxV.z) maxV.z = p.z;
+      if (point.x > maxV.x) maxV.x = point.x;
+      if (point.y > maxV.y) maxV.y = point.y;
+      if (point.z > maxV.z) maxV.z = point.z;
     }
 
     final center = (minV + maxV) * 0.5;
 
     double maxSquareRadius = 0.0;
 
-    for (final p in points) {
-      final squareDistance = p.distanceToSquared(center);
+    for (final point in points) {
+      final squareDistance = point.distanceToSquared(center);
 
-      if (squareDistance > maxSquareRadius) {
-        maxSquareRadius = squareDistance;
-      }
+      if (squareDistance > maxSquareRadius) maxSquareRadius = squareDistance;
     }
 
     return BoundingSphere(center, math.sqrt(maxSquareRadius));

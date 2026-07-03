@@ -3,7 +3,8 @@ import 'dart:math' as math;
 import 'package:vector_math/vector_math_64.dart';
 
 import '../scene/node.dart';
-import 'figure.dart';
+
+import '../scene/figure.dart';
 
 /// A structural node used to group multiple scene nodes.
 ///
@@ -13,6 +14,14 @@ class Group extends Node {
 
   Group({super.transform});
 
+  /// Re-centers the group's local pivot using the world-space center of all descendant [Figure] geometry.
+  ///
+  /// The method computes a world-space Axis-Aligned Bounding Box (AABB) encompassing every vertex belonging to direct
+  /// child figures and then repositions the group so the bounding box center becomes the new local origin.
+  ///
+  /// Unlike [Figure.center], this operation does not modify geometry data.
+  ///
+  /// Instead, only the group's local transformation is adjusted.
   void center() {
     if (children.isEmpty) return;
 
@@ -23,11 +32,11 @@ class Group extends Node {
       if (child is Figure) {
         final world = child.worldMatrix;
 
-        for (final v in child.vertices) {
-          final p = world.transform3(v.clone());
+        for (final vertex in child.vertices) {
+          final point = world.transform3(vertex.clone());
 
-          minX = math.min(minX, p.x); minY = math.min(minY, p.y); minZ = math.min(minZ, p.z);
-          maxX = math.max(maxX, p.x); maxY = math.max(maxY, p.y); maxZ = math.max(maxZ, p.z);
+          minX = math.min(minX, point.x); minY = math.min(minY, point.y); minZ = math.min(minZ, point.z);
+          maxX = math.max(maxX, point.x); maxY = math.max(maxY, point.y); maxZ = math.max(maxZ, point.z);
         }
       }
     }

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:vector_math/vector_math_64.dart';
 
@@ -86,8 +87,9 @@ class Camera extends Node {
   /// ### Parameters:
   ///
   /// - [worldPoint]: The coordinate expressed in world space.
-  Vector3 toViewSpace(Vector3 worldPoint) {
-    return viewMatrix.transform3(worldPoint.clone());
+  /// - [out]: An optional target vector to store the result and avoid memory allocation.
+  Vector3 toViewSpace(Vector3 worldPoint, [Vector3? out]) {
+    return viewMatrix.transformed3(worldPoint, out);
   }
 
   /// Positions the camera so that the specified node fits entirely within the viewport.
@@ -100,15 +102,10 @@ class Camera extends Node {
   /// ### Parameters:
   ///
   /// - [node]: The node to frame.
-  /// - [viewportWidth]: Viewport width in screen pixels.
-  /// - [viewportHeight]: Viewport height in screen pixels.
+  /// - [size]: The viewport dimensions in pixels.
   ///
   /// Nodes with a zero-radius bounding sphere are ignored.
-  void frame({
-    required Node node,
-    required double viewportWidth,
-    required double viewportHeight,
-  }) {
+  void frame(Node node, Size size) {
     final sphere = node.worldBoundingSphere;
 
     // Ignores empty bounding volumes.
@@ -123,7 +120,7 @@ class Camera extends Node {
 
     if (projectionMode == ProjectionMode.perspective) {
       final halfFovV = (fov / 2.0) * math.pi / 180.0;
-      final aspect = viewportWidth / viewportHeight;
+      final aspect = size.width / size.height;
       final halfFovH = math.atan(math.tan(halfFovV) * aspect);
 
       // Uses the most restrictive visible angle to ensure that the entire sphere remains inside the viewport.
@@ -134,15 +131,22 @@ class Camera extends Node {
       transform.setTranslation(position);
     }
     else {
-      final requiredWorldHeight = sphere.radius * 2.0;
+      // Computes the required visible diameter in world-space units.
+      final requiredWorldSize = sphere.radius * 2.0;
 
-      // Adjusts the orthographic scale factor.
-      pixelsPerUnit = viewportHeight / requiredWorldHeight;
+      // Converts viewport resolution into orthographic scale density.
+      //
+      // The smallest viewport dimension is used to preserve aspect ratio while ensuring the entire sphere remains
+      // visible inside the screen boundaries.
+      final ppu = math.min(size.width, size.height) / requiredWorldSize;
 
-      // Orthographic projection does not depend on distance for scale, therefore the camera is simply offset for
-      //stable visibility.
-      final distance = sphere.radius + 10.0;
-      final position = sphere.center - (forward * distance);
+      // Applies a small framing margin to avoid edge clipping.
+      pixelsPerUnit = ppu * 0.9;
+
+      // Orthographic projection is scale-independent from camera depth.
+      //
+      // The camera is repositioned only to keep the target volume inside the visible view region.
+      final position = Vector3(sphere.center.x, sphere.center.y, sphere.radius);
 
       transform.setTranslation(position);
     }

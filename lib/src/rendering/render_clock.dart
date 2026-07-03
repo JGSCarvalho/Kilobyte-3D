@@ -51,7 +51,6 @@ class RenderClock extends ChangeNotifier {
 
     _stopwatch.start();
     _ticker.start();
-    
   }
 
   /// Processes V-Sync callbacks and dispatches repaint notifications when a new frame interval is reached.
